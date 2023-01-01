@@ -1,0 +1,5 @@
+usage: (in docker container)
+
+	1. `sh run.sh <source_file_name>` to generate IR of the source code
+	2. `sh test.sh <number>` to test your code for LV<number>
+
