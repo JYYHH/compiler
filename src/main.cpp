@@ -21,7 +21,7 @@ int main(int argc, const char *argv[]) {
   assert(argc == 5);
   // auto mode = argv[1];
   auto input = argv[2];
-  // auto output = argv[4];
+  auto output = argv[4];
 
   // 打开输入文件, 并且指定 lexer 在解析的时候读取这个文件
   yyin = fopen(input, "r");
@@ -32,9 +32,9 @@ int main(int argc, const char *argv[]) {
   auto ret = yyparse(ast);
   assert(!ret);
 
-  // 输出解析得到的 AST, 其实就是个字符串
-  ast->Dump();
-  cout<<endl;
+
+  // 生成中间代码
+  freopen(output, "w", stdout);
   ast->IRDump(0);
   cout<<endl;
   return 0;
