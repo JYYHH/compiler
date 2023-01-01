@@ -2,4 +2,5 @@
 *.koopa
 *.txt
 *.sh
+koopa.h
 /build
