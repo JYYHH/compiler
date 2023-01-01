@@ -17,7 +17,7 @@ extern int yyparse(unique_ptr<BaseAST> &ast);
 
 int main(int argc, const char *argv[]) { // compiler 模式 输入文件 -o 输出文件
   assert(argc == 5);
-  // auto mode = argv[1];
+  auto mode = argv[1];
   auto input = argv[2];
   auto output = argv[4];
 
@@ -25,7 +25,7 @@ int main(int argc, const char *argv[]) { // compiler 模式 输入文件 -o 输�
   yyin = fopen(input, "r");
   assert(yyin);
 
-  // 调用 parser 函数, parser 函数会进一步调用 lexer 解析输入文件的
+  // Get 语法树 AST
   unique_ptr<BaseAST> ast;
   auto ret = yyparse(ast);
   assert(!ret);
@@ -38,19 +38,25 @@ int main(int argc, const char *argv[]) { // compiler 模式 输入文件 -o 输�
   fflush(IRfile);
   dup2(old_stdout, 1); // 恢复 stdout
 
-  // 生成目标代码
-  ifstream IRstream(output);
-  char ch;
-  char *IR = new char[3333];
-  int lenIR = 0;
+  if (mode[1] == 'r'){
+    // 生成目标代码
+    ifstream IRstream(output);
+    char ch;
+    char *IR = new char[3333];
+    int lenIR = 0;
 
-  while(IRstream.get(ch))
-    if(ch != '\n')
-      IR[lenIR++] = ch;
-  IR[lenIR] = '\0';
+    while(IRstream.get(ch))
+      if(ch != '\n')
+        IR[lenIR++] = ch;
+    IR[lenIR] = '\0';
 
-  printf("%s\n", IR);
-  handle_str_ir(IR);
+    IRstream.close(); // 关闭对IR的读入流
+
+    printf("Intermedia-R = %s\n", IR);
+
+    freopen(output, "w", stdout);
+    handle_str_ir(IR);
+  }
 
   return 0;
 }
