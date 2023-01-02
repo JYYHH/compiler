@@ -269,16 +269,27 @@ void BlockAST :: IRDump() const {
     std::cout << endl << "}";
 }
 
-int var_num, is_01;
+int var_num, is_01; // is_01 = 0 -> binary ; 1 -> 0/1 ; 2 -> const
+int var_ins[100005];
 
 void StmtAST :: IRDump() const {
     var_num = 0;
     exp->IRDump();
-    std::cout << "    ret %" << var_num - 1;
+    if(is_01 >> 1)
+        std::cout << "    ret " << var_ins[var_num - 1];
+    else
+        std::cout << "    ret %" << var_num - 1;
 }
 
-inline void out_IR(int fi, int se, string op){
-    std::cout << "    %" << var_num << " = " << op << " %" << fi << ", %" << se << endl;
+inline void out_IR(int fi, int se, string op, int is_01_fi = 0, int is_01_se = 0){
+    if (!is_01_fi && !is_01_se)
+        std::cout << "    %" << var_num << " = " << op << " %" << fi << ", %" << se << endl;
+    else if(is_01_fi && is_01_se)
+        std::cout << "    %" << var_num << " = " << op << " " << var_ins[fi] << ", " << var_ins[se] << endl;
+    else if(is_01_fi)
+        std::cout << "    %" << var_num << " = " << op << " " << var_ins[fi] << ", %" << se << endl;
+    else
+        std::cout << "    %" << var_num << " = " << op << " %" << fi << ", " << var_ins[se] << endl;
     var_num ++; // whenever var_num ++, we should check whether it's of 01 format, led by an instr after this func
 }
 
@@ -286,8 +297,12 @@ inline void out_IR(int fi, int se, string op){
     // Only after executing Logic and Comparing Operating, we can manipulate a value into 0/1
 
 inline void bin201(){
-    if(is_01 == 0){
+    if (is_01 == 0){
         std::cout << "    %" << var_num << " = ne 0, %" << var_num - 1 << endl;
+        var_num ++, is_01 = 1;
+    }
+    else if (is_01 == 2){
+        std::cout << "    %" << var_num << " = ne 0, " << var_ins[var_num - 1] << endl;
         var_num ++, is_01 = 1;
     }
 }
@@ -326,12 +341,12 @@ void EqExpAST :: IRDump() const {
         relexp->IRDump();
     else{
         eqexp->IRDump();
-        int pre = var_num - 1;
+        int pre = var_num - 1, pre_is = is_01;
         relexp->IRDump();
         if (rel[0] == '=')
-            out_IR(pre, var_num - 1, "eq");
+            out_IR(pre, var_num - 1, "eq", pre_is >> 1, is_01 >> 1);
         else
-            out_IR(pre, var_num - 1, "ne");
+            out_IR(pre, var_num - 1, "ne", pre_is >> 1, is_01 >> 1);
         is_01 = 1;
     }
 }
@@ -340,18 +355,18 @@ void RelExpAST :: IRDump() const {
         addexp->IRDump();
     else{
         relexp->IRDump();
-        int pre = var_num - 1;
+        int pre = var_num - 1, pre_is = is_01;
         addexp->IRDump();
         if (rel[0] == '>')
             if (rel.length() == 1)
-                out_IR(pre, var_num - 1, "gt");
+                out_IR(pre, var_num - 1, "gt", pre_is >> 1, is_01 >> 1);
             else
-                out_IR(pre, var_num - 1, "ge");
+                out_IR(pre, var_num - 1, "ge", pre_is >> 1, is_01 >> 1);
         else
             if (rel.length() == 1)
-                out_IR(pre, var_num - 1, "lt");
+                out_IR(pre, var_num - 1, "lt", pre_is >> 1, is_01 >> 1);
             else
-                out_IR(pre, var_num - 1, "le");
+                out_IR(pre, var_num - 1, "le", pre_is >> 1, is_01 >> 1);
         is_01 = 1;
     }
 }
@@ -360,12 +375,12 @@ void AddExpAST :: IRDump() const {
         mulexp->IRDump();
     else{
         addexp->IRDump();
-        int pre = var_num - 1;
+        int pre = var_num - 1, pre_is = is_01;
         mulexp->IRDump();
         if(opt[0] == '+')
-            out_IR(pre, var_num - 1, "add");
+            out_IR(pre, var_num - 1, "add", pre_is >> 1, is_01 >> 1);
         else
-            out_IR(pre, var_num - 1, "sub");
+            out_IR(pre, var_num - 1, "sub", pre_is >> 1, is_01 >> 1);
         is_01 = 0;
     }
 }
@@ -374,14 +389,14 @@ void MulExpAST :: IRDump() const {
         unaryexp->IRDump();
     else{
         mulexp->IRDump();
-        int pre = var_num - 1;
+        int pre = var_num - 1, pre_is = is_01;
         unaryexp->IRDump();
         if(opt[0] == '*')
-            out_IR(pre, var_num - 1, "mul");
+            out_IR(pre, var_num - 1, "mul", pre_is >> 1, is_01 >> 1);
         else if (opt[0] == '/')
-            out_IR(pre, var_num - 1, "div");
+            out_IR(pre, var_num - 1, "div", pre_is >> 1, is_01 >> 1);
         else
-            out_IR(pre, var_num - 1, "mod");
+            out_IR(pre, var_num - 1, "mod", pre_is >> 1, is_01 >> 1);
         is_01 = 0;
     }
 }
@@ -391,11 +406,17 @@ void UnaryExpAST :: IRDump() const {
     else{
         unaryexp->IRDump();
         if(opt[0] == '-'){
-            std::cout << "    %" << var_num << " = sub 0, %" << var_num - 1 << endl;
+            if(is_01 >> 1)
+                std::cout << "    %" << var_num << " = sub 0, " << var_ins[var_num - 1] << endl;
+            else
+                std::cout << "    %" << var_num << " = sub 0, %" << var_num - 1 << endl;
             var_num ++, is_01 = 0;
         }
         else if (opt[0] == '!'){
-            std::cout << "    %" << var_num << " = eq 0, %" << var_num - 1 << endl;
+            if(is_01 >> 1)
+                std::cout << "    %" << var_num << " = eq 0, " << var_ins[var_num - 1] << endl;
+            else
+                std::cout << "    %" << var_num << " = eq 0, %" << var_num - 1 << endl;
             var_num ++, is_01 = 1;
         }
     }
@@ -405,7 +426,7 @@ void PrimaryExpAST :: IRDump() const {
         exp->IRDump();
     else{
         // std::cout << "    %" << var_num << " = " << number << endl;
-        std::cout << "    %" << var_num << " = or 0, " << number << endl;
-        var_num ++, is_01 = 0;
+        // std::cout << "    %" << var_num << " = or 0, " << number << endl;
+        var_ins[var_num ++] = number, is_01 = 2;
     }
 }

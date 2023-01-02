@@ -15,6 +15,8 @@ using namespace std;
 extern FILE *yyin;
 extern int yyparse(unique_ptr<BaseAST> &ast);
 
+char IR[333333];
+
 int main(int argc, const char *argv[]) { // compiler 模式 输入文件 -o 输出文件
   assert(argc == 5);
   auto mode = argv[1];
@@ -45,7 +47,6 @@ int main(int argc, const char *argv[]) { // compiler 模式 输入文件 -o 输�
     // 生成目标代码
     ifstream IRstream(output);
     char ch;
-    char *IR = new char[3333];
     int lenIR = 0;
 
     while(IRstream.get(ch))

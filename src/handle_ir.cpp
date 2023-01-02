@@ -7,6 +7,8 @@
 
 using namespace std;
 
+// ------------------------ Basic Visit ------------------------------------------------------
+
 void Visit(const koopa_raw_program_t &program){
   // 执行一些其他的必要操作
   // ...
@@ -75,43 +77,47 @@ void Visit(const koopa_raw_value_t &value) {
       // 访问 integer 指令
       Visit(kind.data.integer);
       break;
+    case KOOPA_RVT_BINARY:
+      // 二进制操作指令
+      Visit(kind.data.binary);
+      break;
     default:
       // 其他类型暂时遇不到
       assert(false);
   }
 }
 
+// ------------------------ `koopa_raw_value_t` Visit ------------------------------------------------------
+
 void Visit(const koopa_raw_return_t &ret){
-    cout << "   li a0, ";
-    Visit(ret.value);
-    cout << endl << "   ret" <<endl;
+  cout << "   li a0, ";
+  Visit(ret.value);
+  cout << endl << "   ret" <<endl;
 }
 
 void Visit(const koopa_raw_integer_t &INT){
-    cout << INT.value;
+  cout << INT.value;
+}
+
+void Visit(const koopa_raw_binary_t &BinOP){
+  cout << BinOP.lhs->kind.tag <<endl;
 }
 
 
-
 int handle_str_ir(const char *str){
-    koopa_program_t program;
-    koopa_error_code_t ret = koopa_parse_from_string(str, &program);
-    assert(ret == KOOPA_EC_SUCCESS);  // 确保解析时没有出错
-    // 创建一个 raw program builder, 用来构建 raw program
-    koopa_raw_program_builder_t builder = koopa_new_raw_program_builder();
-    // 将 Koopa IR 程序转换为 raw program
-    koopa_raw_program_t raw = koopa_build_raw_program(builder, program);
-    // 释放 Koopa IR 程序占用的内存
-    koopa_delete_program(program);
+  koopa_program_t program;
+  koopa_error_code_t ret = koopa_parse_from_string(str, &program);
+  assert(ret == KOOPA_EC_SUCCESS);
+  koopa_raw_program_builder_t builder = koopa_new_raw_program_builder();
+  koopa_raw_program_t raw = koopa_build_raw_program(builder, program);
+  koopa_delete_program(program);
 
-    // ---------------------------Handling Raw Function-------------------------------
-    Visit(raw);
-    // ---------------------------End of Handling-------------------------------------
+  // ---------------------------Handling Raw Function-------------------------------
+  Visit(raw);
+  // ---------------------------End of Handling-------------------------------------
 
-    // 处理完成, 释放 raw program builder 占用的内存
-    // 注意, raw program 中所有的指针指向的内存均为 raw program builder 的内存
-    // 所以不要在 raw program 处理完毕之前释放 builder
-    koopa_delete_raw_program_builder(builder);
+  // builder 中 含有 raw_program 用到的所有内存，所以不要在处理好 raw_program 之前释放它
+  koopa_delete_raw_program_builder(builder);
 
-    return 0;
+  return 0;
 }
