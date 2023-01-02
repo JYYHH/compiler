@@ -29,12 +29,15 @@ int main(int argc, const char *argv[]) { // compiler 模式 输入文件 -o 输�
   unique_ptr<BaseAST> ast;
   auto ret = yyparse(ast);
   assert(!ret);
+  cout << "This is our original AST :" << endl << endl;
+  ast->Dump(0);
+  cout << endl;
 
   // 生成中间代码
   auto old_stdout = dup(1);
   FILE *IRfile = freopen(output, "w", stdout);
-  ast->IRDump(0);
-  cout<<endl;
+  ast->IRDump();
+  cout << endl;
   fflush(IRfile);
   dup2(old_stdout, 1); // 恢复 stdout
 
@@ -52,7 +55,7 @@ int main(int argc, const char *argv[]) { // compiler 模式 输入文件 -o 输�
 
     IRstream.close(); // 关闭对IR的读入流
 
-    printf("Intermedia-R = %s\n", IR);
+    printf("\nIntermedia-AST and IR :\n\n%s\n", IR);
 
     freopen(output, "w", stdout);
     handle_str_ir(IR);
