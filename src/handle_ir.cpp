@@ -2,6 +2,7 @@
 #include <memory>
 #include <cassert>
 #include <iostream>
+#include <map>
 #include "handle_ir.h"
 #include "koopa.h"
 
@@ -64,7 +65,30 @@ void Visit(const koopa_raw_basic_block_t &bb) {
   Visit(bb->insts);
 }
 
-// 访问指令
+// --------------------- next part is important-----------------------------
+string reg_name[12] = {
+  "t0",
+  "t1",
+  "t2",
+  "t3",
+  "t4",
+  "t5",
+  "t6",
+  "a3",
+  "a4",
+  "a5",
+  "a6",
+  "a7"
+};
+int now_reg = 0, reg_bound = 13;
+
+map<koopa_raw_binary_t* , int> mmp;
+
+inline string Binary2Register(koopa_raw_binary_t* addr){
+  return reg_name[mmp[addr]];
+}
+
+// -----------------------------------访问指令-------------------------------------
 void Visit(const koopa_raw_value_t &value) {
   // 根据指令类型判断后续需要如何访问
   const auto &kind = value->kind;
@@ -79,7 +103,10 @@ void Visit(const koopa_raw_value_t &value) {
       break;
     case KOOPA_RVT_BINARY:
       // 二进制操作指令
-      Visit(kind.data.binary);
+      if (!mmp.count((koopa_raw_binary_t* )(&kind.data.binary)))
+        Visit(kind.data.binary); 
+      // above : 如果没有访问过，就把这个 binary 指令 `映射` 到一个新的临时寄存器里
+      // 之后如果要用这次 binary 指令的运算结果，直接到这个对应的 reg 里面找就行
       break;
     default:
       // 其他类型暂时遇不到
@@ -90,17 +117,133 @@ void Visit(const koopa_raw_value_t &value) {
 // ------------------------ `koopa_raw_value_t` Visit ------------------------------------------------------
 
 void Visit(const koopa_raw_return_t &ret){
-  cout << "   li a0, ";
-  Visit(ret.value);
-  cout << endl << "   ret" <<endl;
+  if (ret.value->kind.tag == KOOPA_RVT_INTEGER) // 直接ret整数
+    cout << "    li a0, ",Visit(ret.value);
+  else if (ret.value->kind.tag == KOOPA_RVT_BINARY) // ret 寄存器中的值
+    cout<< risc_addi("a0",Binary2Register((koopa_raw_binary_t* )&(ret.value->kind.data.binary)),0);
+  cout << "   ret" <<endl;
 }
 
 void Visit(const koopa_raw_integer_t &INT){
-  cout << INT.value;
+  cout << INT.value << endl;
 }
 
+inline void binary2risc(koopa_raw_binary_op_t optype, string o1, string o2){
+  // 暂时不优化成 addi 等指令
+  // mapping list 在 koopa.h 搜索 "// map = {" 处
+  string &des_reg = reg_name[now_reg];
+  switch (optype){
+    case 0: // neq
+      cout << risc_sub(o1, o1, o2);
+      cout << risc_snez(des_reg, o1);
+      break;
+    case 1: // eq
+      cout << risc_sub(o1, o1, o2);
+      cout << risc_seqz(des_reg, o1);
+      break;
+    case 2: // gt
+      cout << risc_sgt(des_reg, o1, o2);
+      break;
+    case 3: // lt
+      cout << risc_slt(des_reg, o1, o2);
+      break;
+    case 4: // ge (反的lt)
+      cout << risc_slt(o1, o1, o2);
+      cout << risc_seqz(des_reg, o1);
+      break;
+    case 5: // le (反的gt)
+      cout << risc_sgt(o1, o1, o2);
+      cout << risc_seqz(des_reg, o1);
+      break;
+    case 6: // add
+      cout << risc_add(des_reg, o1, o2);
+      break;
+    case 7: // sub
+      cout << risc_sub(des_reg, o1, o2);
+      break;
+    case 8: // mul
+      cout << risc_mul(des_reg, o1, o2);
+      break;
+    case 9: // div
+      cout << risc_div(des_reg, o1, o2);
+      break;
+    case 10: // mod
+      cout << risc_rem(des_reg, o1, o2);
+      break;
+    case 11: // and
+      cout << risc_and(des_reg, o1, o2);
+      break;
+    case 12: // or
+      cout << risc_or(des_reg, o1, o2);
+      break;
+    case 13: // xor 
+      cout << risc_xor(des_reg, o1, o2);
+      break;
+    case 14: // shl
+      cout << risc_sll(des_reg, o1, o2);
+      break;
+    case 15: // shr
+      cout << risc_srl(des_reg, o1, o2);
+      break;
+    case 16: // sar
+      cout << risc_sra(des_reg, o1, o2);
+      break;
+    default:
+      // 未知的binary 操作码
+      assert(false);
+  }
+}
+
+// visit this instr for the first time, return the reg_id
+// And each Binary code will be visit only once
 void Visit(const koopa_raw_binary_t &BinOP){
-  cout << BinOP.lhs->kind.tag <<endl;
+  // lhs and rhs can only be 0(imm) or 12(ref of result of before instr)
+  // test the kind of lhs and rhs
+      // cout << "test time : " << BinOP.lhs->kind.tag << ' ' << BinOP.rhs->kind.tag << endl;
+      // if (BinOP.lhs->kind.tag == 12)
+      //   cout << "lhs uses Register : " << Binary2Register((koopa_raw_binary_t* )&(BinOP.lhs->kind.data.binary)) <<endl;
+      // if (BinOP.rhs->kind.tag == 12)
+      //   cout << "rhs uses Register : " << Binary2Register((koopa_raw_binary_t* )&(BinOP.rhs->kind.data.binary)) <<endl;  
+      // cout << "This Binary uses Register : " << reg_name[now_reg] << endl;
+  // above is Register Alloc Test, and this Program has passed it.
+
+
+  mmp[(koopa_raw_binary_t* )(&BinOP)] = now_reg;
+  // And we promise, when you come into this function, 
+    // the child of potential Binary Type has been already computed.
+    // SO Which occurred above WILL NOT CAUSE ANY BAD Effect !!!
+  
+  int l_p = (BinOP.lhs->kind.tag == 12), r_p = (BinOP.rhs->kind.tag == 12);
+  if (l_p && r_p)
+    binary2risc(
+      BinOP.op, 
+      Binary2Register((koopa_raw_binary_t* )&(BinOP.lhs->kind.data.binary)), 
+      Binary2Register((koopa_raw_binary_t* )&(BinOP.rhs->kind.data.binary))
+    );
+  else if (!l_p && !r_p){
+    cout << risc_li("a1",BinOP.lhs->kind.data.integer.value);
+    cout << risc_li("a2",BinOP.rhs->kind.data.integer.value);
+    binary2risc(BinOP.op, "a1", "a2");
+  }
+  else if (l_p){
+    cout << risc_li("a2",BinOP.rhs->kind.data.integer.value);
+    binary2risc(
+      BinOP.op, 
+      Binary2Register((koopa_raw_binary_t* )&(BinOP.lhs->kind.data.binary)), 
+      "a2"
+    );
+  }
+  else{
+    cout << risc_li("a1",BinOP.lhs->kind.data.integer.value);
+    binary2risc(
+      BinOP.op, 
+      "a1",
+      Binary2Register((koopa_raw_binary_t* )&(BinOP.rhs->kind.data.binary))
+    );
+  }
+
+  // 彻底翻译完了这条指令，__把我们的运算结果放在了 reg_name[now_reg]里__，我们才能翻篇
+  now_reg ++; 
 }
 
 

@@ -8,7 +8,6 @@
 #include <unistd.h>
 #include "ast.h"
 #include "handle_ir.h"
-// #include "koopa.h"
 
 using namespace std;
 
@@ -43,7 +42,7 @@ int main(int argc, const char *argv[]) { // compiler 模式 输入文件 -o 输�
   fflush(IRfile);
   dup2(old_stdout, 1); // 恢复 stdout
 
-  if (mode[1] == 'r'){
+  if (mode[1] == 'r'){ // -riscv
     // 生成目标代码
     ifstream IRstream(output);
     char ch;

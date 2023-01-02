@@ -49,7 +49,11 @@ class StmtAST : public BaseAST {
 };
 
 
-// --------------------------------- Lv_2 ------------------------------------
+// --------------------------------- Lv_3  Operator-------------------------------------
+
+// Useful Functions:
+  // inline void out_IR(int fi, int se, string op, int is_01_fi = 0, int is_01_se = 0);
+  // inline void bin201();
 
 class ExpAST : public BaseAST {
  public:
@@ -110,6 +114,7 @@ class MulExpAST : public BaseAST {
   void IRDump() const override;
 };
 
+// useless class
 // class UnaryOpAST : public BaseAST {
 //  public:
 //   std::string opt;
