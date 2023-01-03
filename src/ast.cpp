@@ -271,6 +271,7 @@ void BlockAST :: IRDump() const {
 
 int var_num, is_01; // is_01 = 0 -> binary ; 1 -> 0/1 ; 2 -> const
 int var_ins[1005]; // an optimization on saved IR register --- save constant before
+// we save space for useless `%xx` items in IR-code, since they're all constant 
 
 void StmtAST :: IRDump() const {
     var_num = 0;

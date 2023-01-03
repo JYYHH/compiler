@@ -42,7 +42,6 @@ int handle_str_ir(const char *str);
 #define risc_mul(rd,rs1,rs2) "   mul "<<rd<<", "<<rs1<<", "<<rs2<<endl // Reg[rd] = Reg[rs1] * Reg[rs2]
 #define risc_div(rd,rs1,rs2) "   div "<<rd<<", "<<rs1<<", "<<rs2<<endl // Reg[rd] = Reg[rs1] / Reg[rs2]
 #define risc_rem(rd,rs1,rs2) "   rem "<<rd<<", "<<rs1<<", "<<rs2<<endl // Reg[rd] = Reg[rs1] % Reg[rs2]
-inline void binary2risc(const koopa_raw_binary_t &BinOP);
 
 // RISC-V 访存类
 #define risc_lw(rd,rs,imm) "   lw "<<rs<<", "<<imm<<'('<<rd<<')'<<endl // Reg[rs] = Mem[Reg[rd] + imm]
@@ -58,4 +57,5 @@ inline void binary2risc(const koopa_raw_binary_t &BinOP);
 
 
 // 杂：Other Functions
-// inline string Binary2Register(koopa_raw_binary_t* addr);
+// inline string Binary2Register(koopa_raw_binary_t* addr);  ------> 从Binary Instr Addr 到 Reg_Name 的映射
+// inline void binary2risc(koopa_raw_binary_op_t optype, string o1, string o2);  ----> Binary Instr 到 riscv代码映射

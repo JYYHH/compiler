@@ -122,6 +122,8 @@ void Visit(const koopa_raw_return_t &ret){
   else if (ret.value->kind.tag == KOOPA_RVT_BINARY) // ret 寄存器中的值
     cout<< risc_addi("a0",Binary2Register((koopa_raw_binary_t* )&(ret.value->kind.data.binary)),0);
   cout << "   ret" <<endl;
+
+  now_reg = 0; // 清空已用的寄存器数量
 }
 
 void Visit(const koopa_raw_integer_t &INT){
