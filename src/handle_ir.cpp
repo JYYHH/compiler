@@ -247,6 +247,8 @@ void Visit(const koopa_raw_binary_t &BinOP){
 
   // 彻底翻译完了这条指令，__把我们的运算结果放在了 reg_name[now_reg]里__，我们才能翻篇
   now_reg ++; 
+  if(now_reg >= 13)
+    exit(1);
 }
 
 
