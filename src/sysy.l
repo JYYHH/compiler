@@ -19,7 +19,8 @@ using namespace std;
 WhiteSpace    [ \t\n\r]*
 LineComment   "//".*
 /* ComplexLineComment "/"\*.*\*"/" */
-ComplexLineComment "/"\*(.*)?\*"/"
+/* ComplexLineComment "/"\*[.\t\n\r]*\*"/" */
+ComplexLineComment "/"\*[^*]*[*]+([^*/][^*]*[*]+)*"/"
 
 
 /* 标识符 */
