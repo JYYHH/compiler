@@ -100,6 +100,13 @@ Exp
   : LOrExp {
     auto ast = new ExpAST();
     ast->lorexp = unique_ptr<BaseAST>($1);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->lorexp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->lorexp->val;
+    //
+
     $$ = ast;
   }
   ;
@@ -109,6 +116,13 @@ LOrExp
     auto ast = new LOrExpAST();
     ast->sel = 0;
     ast->landexp = unique_ptr<BaseAST>($1);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->landexp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->landexp->val;
+    //
+
     $$ = ast;
   }
   | LOrExp OROPT LAndExp {
@@ -116,6 +130,13 @@ LOrExp
     ast->sel = 1;
     ast->lorexp = unique_ptr<BaseAST>($1);
     ast->landexp = unique_ptr<BaseAST>($3);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->lorexp->can_compute && ast->landexp->can_compute;
+    if (ast->can_compute)
+        ast->val = ast->lorexp->val || ast->landexp->val;
+    //
+
     $$ = ast;
   }
   ;
@@ -125,6 +146,13 @@ LAndExp
     auto ast = new LAndExpAST();
     ast->sel = 0;
     ast->eqexp = unique_ptr<BaseAST>($1);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->eqexp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->eqexp->val;
+    //
+
     $$ = ast;
   }
   | LAndExp ANDOPT EqExp {
@@ -132,6 +160,13 @@ LAndExp
     ast->sel = 1;
     ast->landexp = unique_ptr<BaseAST>($1);
     ast->eqexp = unique_ptr<BaseAST>($3);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->landexp->can_compute && ast->eqexp->can_compute;
+    if (ast->can_compute)
+        ast->val = ast->landexp->val && ast->eqexp->val;
+    //
+
     $$ = ast;
   }
   ;
@@ -141,6 +176,13 @@ EqExp
     auto ast = new EqExpAST();
     ast->sel = 0;
     ast->relexp = unique_ptr<BaseAST>($1);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->relexp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->relexp->val;
+    //
+
     $$ = ast;
   }
   | EqExp EQOPT RelExp {
@@ -149,6 +191,17 @@ EqExp
     ast->eqexp = unique_ptr<BaseAST>($1);
     ast->rel = *unique_ptr<string>($2);
     ast->relexp = unique_ptr<BaseAST>($3);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->eqexp->can_compute && ast->relexp->can_compute;
+    if (ast->can_compute){
+      if (ast->rel[0] == '=')
+        ast->val = ast->eqexp->val == ast->relexp->val;
+      else 
+        ast->val = ast->eqexp->val != ast->relexp->val;
+    }
+    //
+
     $$ = ast;
   }
   ;
@@ -158,6 +211,13 @@ RelExp
     auto ast = new RelExpAST();
     ast->sel = 0;
     ast->addexp = unique_ptr<BaseAST>($1);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->addexp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->addexp->val;
+    //
+
     $$ = ast;
   }
   | RelExp RELOPT AddExp {
@@ -166,6 +226,25 @@ RelExp
     ast->relexp = unique_ptr<BaseAST>($1);
     ast->rel = *unique_ptr<string>($2);
     ast->addexp = unique_ptr<BaseAST>($3);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->relexp->can_compute && ast->addexp->can_compute;
+    if (ast->can_compute){
+      if (ast->rel[0] == '>'){
+        if (ast->rel.length() == 1)
+          ast->val = ast->relexp->val > ast->addexp->val;
+        else 
+          ast->val = ast->relexp->val >= ast->addexp->val;
+      }
+      else{
+        if (ast->rel.length() == 1)
+          ast->val = ast->relexp->val < ast->addexp->val;
+        else 
+          ast->val = ast->relexp->val <= ast->addexp->val;
+      }
+    }
+    //
+
     $$ = ast;
   }
   ;
@@ -175,6 +254,13 @@ AddExp
     auto ast = new AddExpAST();
     ast->sel = 0;
     ast->mulexp = unique_ptr<BaseAST>($1);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->mulexp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->mulexp->val;
+    //
+
     $$ = ast;
   }
   | AddExp UOP MulExp {
@@ -183,6 +269,19 @@ AddExp
     ast->addexp = unique_ptr<BaseAST>($1);
     ast->opt = *unique_ptr<string>($2);
     ast->mulexp = unique_ptr<BaseAST>($3);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->addexp->can_compute && ast->mulexp->can_compute;
+    if (ast->can_compute){
+      if (ast->opt[0] == '+')
+        ast->val = ast->addexp->val + ast->mulexp->val;
+      else if (ast->opt[0] == '-')
+        ast->val = ast->addexp->val - ast->mulexp->val;
+      else
+        exit(2);
+    }
+    //
+
     $$ = ast;
   }
   ;
@@ -192,6 +291,13 @@ MulExp
     auto ast = new MulExpAST();
     ast->sel = 0;
     ast->unaryexp = unique_ptr<BaseAST>($1);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->unaryexp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->unaryexp->val;
+    //
+
     $$ = ast;
   }
   | MulExp MULOPT UnaryExp {
@@ -200,6 +306,19 @@ MulExp
     ast->mulexp = unique_ptr<BaseAST>($1);
     ast->opt = *unique_ptr<string>($2);
     ast->unaryexp = unique_ptr<BaseAST>($3);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->mulexp->can_compute && ast->unaryexp->can_compute;
+    if (ast->can_compute){
+      if (ast->opt[0] == '*')
+        ast->val = ast->mulexp->val * ast->unaryexp->val;
+      else if (ast->opt[0] == '/')
+        ast->val = ast->mulexp->val / ast->unaryexp->val;
+      else 
+        ast->val = ast->mulexp->val % ast->unaryexp->val;
+    }
+    //
+
     $$ = ast;
   }
   ;
@@ -209,6 +328,13 @@ UnaryExp
     auto ast = new UnaryExpAST();
     ast->sel = 0;
     ast->pexp = unique_ptr<BaseAST>($1);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->pexp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->pexp->val;
+    //
+
     $$ = ast;
   }
   | UOP UnaryExp {
@@ -216,6 +342,19 @@ UnaryExp
     ast->sel = 1;
     ast->opt = *unique_ptr<string>($1);
     ast->unaryexp = unique_ptr<BaseAST>($2);
+
+    // Pre-Compute Tech
+    ast->can_compute = ast->unaryexp->can_compute;
+    if (ast->can_compute){
+      if (ast->opt[0] == '-')
+        ast->val = -ast->unaryexp->val;
+      else if (ast->opt[0] == '!')
+        ast->val = !ast->unaryexp->val;
+      else 
+        ast->val = ast->unaryexp->val;
+    }
+    //
+
     $$ = ast;
   }
   ;
@@ -233,12 +372,25 @@ PrimaryExp
     auto ast = new PrimaryExpAST();
     ast->sel = 0;
     ast->exp = unique_ptr<BaseAST>($2);
+    
+    // Pre-Compute Tech
+    ast->can_compute = ast->exp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->exp->val;
+    //
+    
     $$ = ast;
   }
   | Number {
     auto ast = new PrimaryExpAST();
     ast->sel = 1;
     ast->number = ($1);
+
+    // Pre-Compute Tech
+    ast->can_compute = 1;
+    ast->val = ast->number;
+    //
+
     $$ = ast;
   }
   ;

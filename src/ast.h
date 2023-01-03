@@ -1,6 +1,20 @@
 #pragma once
 
-// 注意，我们print出来的AST和IR不仅正确性✔很重要，可读性也很重要（方便debug）
+/*
+    Notes here:
+        1. Dump() 输出基本结构
+        2. IRDump() 将 koopa 输出到 stdout （然后重定向到output）里
+        3. var_ins[] 的存在，优化了常数加载的指令 (省去所有常数加载的指令，大量减少指令数目)
+          // is_01 = 0 -> binary ; 1 -> 0/1 ; 2 -> const
+        4. BaseAST 中的 can_compute, val : 编译时预处理技术，提前将可以算的东西算出来, `可以与3.协同工作`
+          详情见 `sysy.y` 中所有有 "// Pre-Compute Tech" tag 的部分
+            由于我们在父节点只需要知道子节点是不是可以提前算，并且如果可以的话值是多少，所以 BaseAST 只需要
+            多定义 can_compute, val 俩变量
+          
+          适用该技术的最高层为 `Exp`，也就是说再高了我们就 不需要 也 不能再用 该技术了
+        5. 
+*/
+
 
 class BaseAST {
  public:
@@ -8,6 +22,7 @@ class BaseAST {
   virtual void Dump(int sj) const = 0;
   virtual void IRDump() const = 0;
   inline void HandleSJ(int sj) const ;
+  int can_compute, val;
 };
 
 class CompUnitAST : public BaseAST {
@@ -54,6 +69,7 @@ class StmtAST : public BaseAST {
 // Useful Functions:
   // inline void out_IR(int fi, int se, string op, int is_01_fi = 0, int is_01_se = 0);
   // inline void bin201();
+  // inline void alr_compute_procedure(int NUMb);
 
 class ExpAST : public BaseAST {
  public:

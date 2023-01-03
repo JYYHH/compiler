@@ -297,6 +297,10 @@ inline void out_IR(int fi, int se, string op, int is_01_fi = 0, int is_01_se = 0
     //---------------- Expression Part--------------------------------
     // Only after executing Logic and Comparing Operating, we can manipulate a value into 0/1
 
+inline void alr_compute_procedure(int NUMb){
+    var_ins[var_num ++] = NUMb, is_01 = 2;
+}
+
 inline void bin201(){
     if (is_01 == 0){
         std::cout << "    %" << var_num << " = ne 0, %" << var_num - 1 << endl;
@@ -309,9 +313,19 @@ inline void bin201(){
 }
 
 void ExpAST :: IRDump() const {
+    if (can_compute){
+        alr_compute_procedure(val);
+        return;
+    }
+    
     lorexp->IRDump();
 }
 void LOrExpAST :: IRDump() const {
+    if (can_compute){
+        alr_compute_procedure(val);
+        return;
+    }
+
     if (sel == 0)
         landexp->IRDump();
     else{
@@ -325,6 +339,11 @@ void LOrExpAST :: IRDump() const {
     }
 }
 void LAndExpAST :: IRDump() const {
+    if (can_compute){
+        alr_compute_procedure(val);
+        return;
+    }
+
     if (sel == 0)
         eqexp->IRDump();
     else{
@@ -338,6 +357,11 @@ void LAndExpAST :: IRDump() const {
     }
 }
 void EqExpAST :: IRDump() const {
+    if (can_compute){
+        alr_compute_procedure(val);
+        return;
+    }
+
     if (sel == 0)
         relexp->IRDump();
     else{
@@ -352,6 +376,11 @@ void EqExpAST :: IRDump() const {
     }
 }
 void RelExpAST :: IRDump() const {
+    if (can_compute){
+        alr_compute_procedure(val);
+        return;
+    }
+
     if (sel == 0)
         addexp->IRDump();
     else{
@@ -372,6 +401,11 @@ void RelExpAST :: IRDump() const {
     }
 }
 void AddExpAST :: IRDump() const {
+    if (can_compute){
+        alr_compute_procedure(val);
+        return;
+    }
+
     if (sel == 0)
         mulexp->IRDump();
     else{
@@ -386,6 +420,11 @@ void AddExpAST :: IRDump() const {
     }
 }
 void MulExpAST :: IRDump() const {
+    if (can_compute){
+        alr_compute_procedure(val);
+        return;
+    }
+
     if (sel == 0)
         unaryexp->IRDump();
     else{
@@ -402,6 +441,11 @@ void MulExpAST :: IRDump() const {
     }
 }
 void UnaryExpAST :: IRDump() const {
+    if (can_compute){
+        alr_compute_procedure(val);
+        return;
+    }
+
     if (sel == 0)
         pexp->IRDump();
     else{
@@ -423,11 +467,16 @@ void UnaryExpAST :: IRDump() const {
     }
 }
 void PrimaryExpAST :: IRDump() const {
+    if (can_compute){
+        alr_compute_procedure(val);
+        return;
+    }
+
     if (sel == 0)
         exp->IRDump();
     else{
         // std::cout << "    %" << var_num << " = " << number << endl;
         // std::cout << "    %" << var_num << " = or 0, " << number << endl;
-        var_ins[var_num ++] = number, is_01 = 2;
+        alr_compute_procedure(number);
     }
 }
