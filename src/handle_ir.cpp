@@ -66,7 +66,7 @@ void Visit(const koopa_raw_basic_block_t &bb) {
 }
 
 // --------------------- next part is important-----------------------------
-string reg_name[11] = {
+string reg_name[13] = {
   "a0",
   "t1",
   "t2",
@@ -78,7 +78,8 @@ string reg_name[11] = {
   "a4",
   "a5",
   "a6",
-  "a7"
+  "a7",
+  "t0"
 };
 int now_reg = 0, reg_bound = 13;
 
