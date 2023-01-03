@@ -22,7 +22,7 @@ int handle_str_ir(const char *str);
 #define risc_la(rd,label) "   la "<<rd<<", "<<label<<endl // Reg[rd] = GetAddr(label)
 #define risc_li(rd,imm) "   li "<<rd<<", "<<imm<<endl // Reg[rd] = imm
 
-// RISC-V 运算类
+// RISC-V 运算类 下面的 imm 都是 imm12 ! 只有 12 bits 宽
 #define risc_add(rd,rs1,rs2) "   add "<<rd<<", "<<rs1<<", "<<rs2<<endl // Reg[rd] = Reg[rs1] + Reg[rs2]
 #define risc_addi(rd,rs1,imm) "   addi "<<rd<<", "<<rs1<<", "<<imm<<endl // Reg[rd] = Reg[rs1] + imm
 #define risc_sub(rd,rs1,rs2) "   sub "<<rd<<", "<<rs1<<", "<<rs2<<endl // Reg[rd] = Reg[rs1] - Reg[rs2]
@@ -43,7 +43,7 @@ int handle_str_ir(const char *str);
 #define risc_div(rd,rs1,rs2) "   div "<<rd<<", "<<rs1<<", "<<rs2<<endl // Reg[rd] = Reg[rs1] / Reg[rs2]
 #define risc_rem(rd,rs1,rs2) "   rem "<<rd<<", "<<rs1<<", "<<rs2<<endl // Reg[rd] = Reg[rs1] % Reg[rs2]
 
-// RISC-V 访存类
+// RISC-V 访存类 下面的 imm 都是 imm12 ! 只有 12 bits 宽
 #define risc_lw(rd,rs,imm) "   lw "<<rs<<", "<<imm<<'('<<rd<<')'<<endl // Reg[rs] = Mem[Reg[rd] + imm]
 #define risc_sw(rd,rs,imm) "   sw "<<rs<<", "<<imm<<'('<<rd<<')'<<endl // Mem[Reg[rd] + imm] = Reg[rs]
 

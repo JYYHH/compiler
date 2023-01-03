@@ -66,8 +66,8 @@ void Visit(const koopa_raw_basic_block_t &bb) {
 }
 
 // --------------------- next part is important-----------------------------
-string reg_name[12] = {
-  "t0",
+string reg_name[11] = {
+  // "t0",
   "t1",
   "t2",
   "t3",
