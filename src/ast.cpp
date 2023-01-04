@@ -87,7 +87,7 @@ inline void alr_compute_procedure(int NUMb){
 }
 
 inline int BaseAST :: PreComputeProcedure() const{
-    if (can_compute == 2){ // in this condition, we handle this instr already in the parsing time.
+    if (can_compute){ // in this condition, we handle this instr already in the parsing time.
         alr_compute_procedure(val);
         return 1;
     }
@@ -502,7 +502,7 @@ void BlockItemAST :: IRDump() const {
 void StmtAST :: IRDump() const {
     // var_num = 0;
     if (sel == 1){
-        if (can_compute == 2)
+        if (can_compute)
             std::cout << "    ret " << val << endl;
         else{
             exp->IRDump();
@@ -513,10 +513,12 @@ void StmtAST :: IRDump() const {
         }
     }
     else{
-        if (can_compute == 2){
-            string alter_one = lval;
-            present_tbl()->GetItemByName(alter_one);
-            std::cout << "    store " << val << ", @" << present_tbl()->present->ST_name << '_' << lval << endl;
+        if (can_compute){
+            // can be ignored, the reason is so fancy... See the comment on the top of 'ast.h'
+
+            // string alter_one = lval;
+            // present_tbl()->GetItemByName(alter_one);
+            // std::cout << "    store " << val << ", @" << present_tbl()->present->ST_name << '_' << lval << endl;
             return;
         }
 
@@ -530,7 +532,7 @@ void StmtAST :: IRDump() const {
         else
             std::cout << "    store %" << var_num - 1 << ", @" << present_tbl()->present->ST_name << '_' << lval << endl;
         // And you can consider why there's not other condition?
-        // BBBBBecause, all the tree nodes' 'can_compute == 2' are already determined, after `sysy.y`
+        // BBBBBecause, all the tree nodes' 'can_compute' are already determined, after `sysy.y`
             // scans the source code.
 
         // But I finally add this function, mainly for testing my code, without pre-compiling tech
@@ -767,7 +769,7 @@ void VarDefAST :: IRDump() const {
     //@x = alloc i32
     std::cout << "    @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << endl;
     // 保证 ident 在当前 symbol table 里
-    if (can_compute == 2)
+    if (can_compute)
         std::cout << "    store " << val << ", @" << present_tbl()->ST_name << '_' << ident << endl;
     else if (sel){
         initval->IRDump();

@@ -48,6 +48,13 @@
                   !!!!!!!!!!!!!! 也不能管 !!!!!!!!!!!!!!!!!
                   !!!!!!!!!!!!!! 也不能管 !!!!!!!!!!!!!!!!!
 
+                3. 'void StmtAST :: IRDump() const {' 中，我们如果发现给 Var 赋值是 can_compute，
+                  可以直接 return 而不用在解析 IR 时将这个赋值给放到 @Var 里
+                    可以思考一下Why?
+                    The Answer is that : 因为这个赋值在 parsing 的时候就已知了，（于是Var在Symtbl中被置成已知的）
+                      所以在用到这个赋值的所有position，这个赋值都已经被 (at least) 转交给了它上层的 PrimaryEXP ！
+                
+
         *7.5 一份有例子的详细比较：
             1: 对于 const 定义和利用的能力：一致，因为我也实现了符号表
             2: 多次对一个变量修改，但如果每次用这个变量都是它被修改成可在 parsing时计算 (can_compute == 1)
