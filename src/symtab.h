@@ -20,7 +20,8 @@ class SymbolTableItem {
     SymbolTableItem(int SEL, int VAL) : sel(SEL|2),val(VAL){}
     int VarType();
     int VarVal();
-    void SetVal(const int &new_val);
+    void SetVal(const int &new_val); // 只能处理，给Var赋常值的情况
+    void BecomeUnknown();
 };
 
 class SymbolTable {

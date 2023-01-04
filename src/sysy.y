@@ -141,8 +141,11 @@ Stmt
       exit(4);
     if (!(ret->VarType() & 1))
       exit(6);
+
+    // Changing the Mode of a Var
     if (ast->exp->can_compute == 0){
       ast->can_compute = 0;
+      ret->BecomeUnknown();
       // waiting computing it on the stack
     }
     else{

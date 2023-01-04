@@ -26,26 +26,47 @@
         6. 注意 ConstDef (sysy.y) 中变量赋值必须是已经计算好的，这就需要我们check一下can_compute
           其实相当于也是 4. 的延申
 
-        *7. 这里借机讨论一下，我的代码和文法实现编译时常量预计算的不同：
+        *7. 这里借机讨论一下，我的代码和文法实现编译时常量预计算的不同：）
             1. 首先肯定两者都是对的，不会有运行时错误
-            2. 我们的文法是通过实现 Const 和 Var 量定义的分开，来实现这个功能；并且要求
+            2. std文法是通过实现 Const 和 Var 量定义的分开，来实现这个功能；并且要求
               Const 在定义时就必须计算出来。
               ;---------------> 这是一种自顶向下的方法
                 这当然是好的，这样我们在向下递归的过程中，根据已经过的路径就已经知道之后的量可不可以被算出来了；
-                但缺点是，如果有程序员压根就不会用 const 定义，这样定义出的最终代码效率一定会打折扣的
+                缺点见 7.5
             3. 而我的预编译方法是，自底向上地看每个Type是否可以在编译时就确定结果，
                 (当然如果定义成const的Type不行，那么我们就会Throw一个error，这是语义错误)
               这样的最大优点 --------------> 所有 编译时就可以确定结果的Type确实都可以被总结出来
               ------------> 如果不能，那么一定是需要 outer_param的，那么我们直接去stack里找就可以了！
           ***** 同样的，由于 ConstDef 必须有返回值，所以我们对于 VarDef的限制是比较少的，这之后可能还会有其他
-            错误，比如右侧的 Exp 即使用了栈里的变量也算不出来
-        
+            错误，比如右侧的 Exp 即使用了栈里的变量也算不出来 *** 但这是语义错误和我有什么关系呢。。。之后管！
+            4. 实现中采用的神奇的地方：
+                1. 查注释 'Changing the Mode of a Var' -> 不管之后生成 IR 的时候咋样，
+                  只要我在 parse的时候能算的东西我一定会算！
+                2. 符号表的Var的值，其实 parsing 之后就完全不会管了，没有用
+                  !!!!!!!!!!!!!! 也不能管 !!!!!!!!!!!!!!!!!
+                  !!!!!!!!!!!!!! 也不能管 !!!!!!!!!!!!!!!!!
+                  !!!!!!!!!!!!!! 也不能管 !!!!!!!!!!!!!!!!!
+                  !!!!!!!!!!!!!! 也不能管 !!!!!!!!!!!!!!!!!
+
+        *7.5 一份有例子的详细比较：
+            1: 对于 const 定义和利用的能力：一致，因为我也实现了符号表
+            2: 多次对一个变量修改，但如果每次用这个变量都是它被修改成可在 parsing时计算 (can_compute == 1)
+              那么我的方法更优
+            3: 常量表达式：显然也是我优，因为std可没有对这个优化
+            4: xxx
+
+
         8. 我们假定，Lv_3 中 binary operator 的返回值都是在 形如 `%num` 这样的变量里的
         9. 我们假定，IR code里，变量的名称总是 @<ST_name>_<var_name>
 
         10. `Can't be this format?` 记录了在 IR 中打tag的失败尝试
 
         11. 想取消4.这个技术也很简单，直接将所有 can_compute 后面加上 == 2 即可
+          这会导致：
+            1. 所有表达式展开至 PrimaryExpAST， 然后通过符号的 const 与否看返回什么样的二进制 instr
+            
+        12. Stmt 中的赋值语句千万不能在 sysy.y 中处理，不然就寄了！( 因为赋值是要随着程序的进行而进行的 )
+          但等式右边是常数的倒是可以先处理?
 
 
 
@@ -67,7 +88,7 @@ class BaseAST {
   virtual void Dump(int sj) const = 0;
   virtual void IRDump() const = 0;
   inline void HandleSJ(int sj) const ;
-  int can_compute /* can be computed in compiling time ? both for exp and valueing stmt */, val;
+  int can_compute /* ___can be computed in compiling time___ ? for types below */, val;
   inline int PreComputeProcedure() const;
   /*
   Already can_compute implemented can_compute TYPE:

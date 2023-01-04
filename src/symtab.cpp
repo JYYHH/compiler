@@ -16,6 +16,9 @@ void SymbolTableItem :: SetVal(const int &new_val){
     val = new_val;
 }
 
+void SymbolTableItem :: BecomeUnknown(){
+    sel &= 1;
+}
 
 void SymbolTable :: Insert(std::string &name, SymbolTableItem &STitem){
     if (ST.count(name))
