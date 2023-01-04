@@ -3,7 +3,7 @@
         1. RISC-V templates below
         2. 目前处理 Binary Instr (of Koopa Format) -> RISC-V 的思路：
             - 每条指令对应一个 Reg，指令执行完存在对应的 Reg里
-            - 这个映射关系用一个 map 维护
+            - 这个映射关系用一个 map 维护, 其中 key 是 koopa_raw_binary_t* 类型的
             - 如果 lhs or rhs 有用到寄存器，那么直接引用；否则把立即数 li 到 a1/a2 里
         
         

@@ -6,7 +6,6 @@
 
 %{
 
-
 #include <iostream>
 #include <memory>
 #include <string>
@@ -18,44 +17,56 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 
 using namespace std;
 
+int total_blk_num = 0;
+stack< BlockAST* > blk_st; // 用来实现块管理
+std::stack< SymbolTable* > * BaseAST::glbstst = new std::stack< SymbolTable* >;
+SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
+
 %}
 
-// 定义 parser 函数和错误处理函数的附加参数
-// 我们需要返回一个字符串作为 AST, 所以我们把附加参数定义成字符串的智能指针
-// 解析完成后, 我们要手动修改这个参数, 把它设置成解析得到的字符串
-%parse-param { std::unique_ptr<BaseAST> &ast } // 这里改成 <BaseAST> 类型，因为我们返回的已经不是毫无组织的字符串了！
 
-// yylval 的定义, 我们把它定义成了一个联合体 (union)
-// 因为 token 的值有的是字符串指针, 有的是整数
-// 之前我们在 lexer 中用到的 str_val 和 int_val 就是在这里被定义的
-// 至于为什么要用字符串指针而不直接用 string 或者 unique_ptr<string>?
-// 请自行 STFW 在 union 里写一个带析构函数的类会出现什么情况
+%parse-param { std::unique_ptr<BaseAST> &ast } 
+// 这里改成 <BaseAST> 类型，因为我们返回的已经不是毫无组织的字符串了
+
+
+
 %union {
   std::string *str_val;
   int int_val;
   BaseAST *ast_val; // 用来返回每个非终结符对应的子语法树
+  std::vector< std::unique_ptr<BaseAST> > *ast_list; // 用来返回vector指针，vector用来存所有子节点
 }
 
-// lexer 返回的所有 token 种类的声明
-// 注意 IDENT 和 INT_CONST 会返回 token 的值, 分别对应 str_val 和 int_val
-%token INT RETURN
+%token INT RETURN CONST
 %token <str_val> IDENT UOP MULOPT RELOPT EQOPT ANDOPT OROPT
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
 %type <ast_val> FuncDef FuncType Block Stmt
+%type <ast_list> Block_inter VarDecl_inter ConstDecl_inter
 // 表达式定义
 %type <ast_val> Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
-// %type <str_val> UnaryOp
+// 常量和变量定义
+%type <ast_val> Decl BlockItem InitVal ConstExp VarDef VarDecl 
+%type <ast_val> ConstInitVal ConstDef ConstDecl
+
+
+%type <str_val> LVal BType
 %type <int_val> Number
 
 %%
 
 
 CompUnit
-  : FuncDef {
+  : { 
+    BaseAST::glbsymbtl->ST_name = "GLOBAL_Table";
+    push_into_tbl_stk( BaseAST::glbsymbtl ); // 全局变量表进入
+  }
+   FuncDef {
     auto comp_unit = make_unique<CompUnitAST>();
-    comp_unit->func_def = unique_ptr<BaseAST>($1);
+    comp_unit->func_def = unique_ptr<BaseAST>($2);
+
+    pop_tbl_stk(); // 全局变量表退出
     ast = move(comp_unit);
   }
   ;
@@ -81,10 +92,22 @@ FuncType
   ;
 
 Block
-  : '{' Stmt '}' {
-    auto ast = new BlockAST();
-    ast->stmt = unique_ptr<BaseAST>($2);
-    $$ = ast;
+  : {
+    total_blk_num ++;
+    auto BLKast = new BlockAST();
+    BLKast->block_id = total_blk_num;
+    BLKast->symbtl = new SymbolTable();
+    BLKast->symbtl->ST_name = "block_" + std::to_string(total_blk_num);
+    blk_st.push(BLKast);
+    push_into_tbl_stk(BLKast->symbtl); // 这个 Block 的符号表进入
+  }
+   '{' Block_inter '}' {
+    auto BLKast = blk_st.top();
+    BLKast->blockitem = ($3);
+    BLKast->child_num = (int)(*(BLKast->blockitem)).size();
+    pop_tbl_stk(); // 这个 Block 的符号表退出
+    blk_st.pop();
+    $$ = BLKast;
   }
   ;
 
@@ -92,6 +115,36 @@ Stmt
   : RETURN Exp ';' {
     auto ast = new StmtAST();
     ast->exp = unique_ptr<BaseAST>($2);
+    ast->sel = 1;
+
+    ast->can_compute = ast->exp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->exp->val;
+
+    $$ = ast;
+  }
+  | LVal '=' Exp ';' {
+    auto ast = new StmtAST();
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->lval = *unique_ptr<string>($1);
+    ast->sel = 0;
+
+    auto pres_symbtl = present_tbl();
+    // Check whether something wrong?
+    auto ret = pres_symbtl->GetItemByName(ast->lval);
+    if (ret == NULL)
+      exit(4);
+    if (!(ret->VarType() & 1))
+      exit(6);
+    if (ast->exp->can_compute == 0){
+      ast->can_compute = 0;
+      // waiting computing it on the stack
+    }
+    else{
+      ast->can_compute = 1;
+      ast->val = ast->exp->val;
+      ret->SetVal(ast->val);
+    }
     $$ = ast;
   }
   ;
@@ -393,6 +446,22 @@ PrimaryExp
 
     $$ = ast;
   }
+  | LVal {
+    auto ast = new PrimaryExpAST();
+    ast->sel = 2;
+    ast->lval = *unique_ptr<string>($1);
+
+    // CAN'T PRECOMPUTE, if and only if it hasn't been computed
+    auto pres_symbtl = present_tbl();
+    auto ret = pres_symbtl->GetItemByName(ast->lval);
+    if (ret == NULL)
+      exit(4);
+    
+    ast->can_compute = ret->VarType() >> 1;
+    ast->val = ret->VarVal();
+
+    $$ = ast;
+  }
   ;
 
 Number
@@ -400,6 +469,213 @@ Number
     $$ = ($1);
   }
   ;
+
+//--------------------------------- Lv 4 ----------------------------------
+  // easy part first
+LVal
+  : IDENT {
+    $$ = ($1);
+  }
+  ;
+
+InitVal
+  : Exp {
+    auto ast = new InitValAST();
+    ast->exp = unique_ptr<BaseAST>($1);
+    // Pre-Compute Tech
+    ast->can_compute = ast->exp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->exp->val;
+    //
+    $$ = ast;
+  }
+  ;
+
+ConstExp
+  : Exp {
+    auto ast = new ConstExpAST();
+    ast->exp = unique_ptr<BaseAST>($1);
+    // Pre-Compute Tech
+    ast->can_compute = ast->exp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->exp->val;
+    //
+    $$ = ast;
+  }
+  ;
+
+ConstInitVal
+  : ConstExp {
+    auto ast = new ConstInitValAST();
+    ast->constexp = unique_ptr<BaseAST>($1);
+    // Pre-Compute Tech
+    ast->can_compute = ast->constexp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->constexp->val;
+    //
+    $$ = ast;
+  }
+  ;
+
+BType
+  : INT {
+    auto nnnn_str = new std::string("int");
+    $$ = nnnn_str;
+  }
+  ;
+
+  // then complicated
+
+Block_inter // 这个类型可以由指向若干个BlockItem的pointer的Vector组成，当然这个类型返回的本身也是指针
+  : {
+    $$ = new std::vector< std::unique_ptr<BaseAST> >;
+  }
+  | Block_inter BlockItem{
+    auto ret = ($1);
+    (*ret).push_back( unique_ptr<BaseAST>($2) );
+    $$ = ret;
+  }
+  ;
+
+BlockItem
+  : Decl {
+    auto ast = new BlockItemAST();
+    ast->decl = unique_ptr<BaseAST>($1);
+    ast->sel = 0;
+    $$ = ast;
+  }
+  | Stmt {
+    auto ast = new BlockItemAST();
+    ast->stmt = unique_ptr<BaseAST>($1);
+    ast->sel = 1;
+    $$ = ast;
+  }
+  ;
+
+Decl
+  : ConstDecl {
+    auto ast = new DeclAST();
+    ast->constdecl = unique_ptr<BaseAST>($1);
+    ast->sel = 0;
+    $$ = ast;
+  }
+  | VarDecl {
+    auto ast = new DeclAST();
+    ast->vardecl = unique_ptr<BaseAST>($1);
+    ast->sel = 1;
+    $$ = ast;
+  }
+  ;
+
+VarDef
+  : IDENT {
+    auto ast = new VarDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->sel = 0;
+
+    // Insert a non-valued item into present symbal table
+    auto pres_symbtl = present_tbl();
+    auto new_symtbl_item = new SymbolTableItem(1);
+    pres_symbtl->Insert(ast->ident, *new_symtbl_item);
+    ast->can_compute = 0; // can't be decided in compiling time
+
+    $$ = ast;
+  }
+  | IDENT '=' InitVal {
+    auto ast = new VarDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->initval = unique_ptr<BaseAST>($3);
+    ast->sel = 1;
+
+    auto pres_symbtl = present_tbl();
+    // Check Whether Already Computed
+    if (ast->initval->can_compute == 0){
+      // Insert a non-valued item into present symbal table
+      auto new_symtbl_item = new SymbolTableItem(1);
+      pres_symbtl->Insert(ast->ident, *new_symtbl_item);
+      // Wait for putting its computing procedure onto the stack?
+      ast->can_compute = 0;
+    }
+    else{
+    // Insert an already-valued item into present symbal table
+      ast->can_compute = 1;
+      ast->val = ast->initval->val;
+      auto new_symtbl_item = new SymbolTableItem(1, ast->val);
+      pres_symbtl->Insert(ast->ident, *new_symtbl_item);
+    }
+
+    $$ = ast;
+  }
+  ;
+
+VarDecl
+  : BType VarDecl_inter ';' {
+    auto ast = new VarDeclAST();
+    ast->btype = *unique_ptr<std::string>($1);
+    ast->vardef = ($2);
+    ast->child_num = (int)(*(ast->vardef)).size();
+    $$ = ast;
+  }
+  ; 
+
+VarDecl_inter
+  : VarDef {
+    auto ret = new std::vector< std::unique_ptr<BaseAST> >;
+    (*ret).push_back( unique_ptr<BaseAST>($1) );
+    $$ = ret;
+  }
+  | VarDecl_inter ',' VarDef {
+    auto ret = ($1);
+    (*ret).push_back( unique_ptr<BaseAST>($3) );
+    $$ = ret;
+  }
+  ;
+
+ConstDef
+  : IDENT '=' ConstInitVal {
+    auto ast = new ConstDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->constinitval = unique_ptr<BaseAST>($3);
+
+    // Check Whether Already Computed
+    if (ast->constinitval->can_compute == 0)
+      exit(5);
+    // Because ConstDef must be computed in the compiling time, 
+      // so we don't use ast->can_compute, it must be 1
+
+    // Insert a const item into present symbal table
+    
+    auto pres_symbtl = present_tbl();
+    auto new_symtbl_item = new SymbolTableItem(0, ast->constinitval->val);
+    pres_symbtl->Insert(ast->ident, *new_symtbl_item);
+
+    $$ = ast;
+  }
+  ;
+
+ConstDecl
+  : CONST BType ConstDecl_inter ';' {
+    auto ast = new ConstDeclAST();
+    ast->btype = *unique_ptr<std::string>($2);
+    ast->constdef = ($3);
+    ast->child_num = (int)(*(ast->constdef)).size();
+    $$ = ast;
+  }
+  ; 
+
+ConstDecl_inter
+  : ConstDef {
+    auto ret = new std::vector< std::unique_ptr<BaseAST> >;
+    (*ret).push_back( unique_ptr<BaseAST>($1) );
+    $$ = ret;
+  }
+  | ConstDecl_inter ',' ConstDef {
+    auto ret = ($1);
+    (*ret).push_back( unique_ptr<BaseAST>($3) );
+    $$ = ret;
+  }
+  ;
+
 
 %%
 

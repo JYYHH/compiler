@@ -6,6 +6,7 @@
 
 #include <cstdlib>
 #include <string>
+#include <vector>
 
 // 因为 Flex 会用到 Bison 中关于 token 的定义
 // 所以需要 include Bison 生成的头文件
@@ -48,6 +49,7 @@ OrOpt         "||"
 
 "int"           { return INT; }
 "return"        { return RETURN; }
+"const"         { return CONST; }
 
 {Identifier}    { yylval.str_val = new string(yytext); return IDENT; }
 {UOp}           { yylval.str_val = new string(yytext); return UOP;}
