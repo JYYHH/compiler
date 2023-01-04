@@ -10,6 +10,14 @@
 
           Now it's      <Instr> -> <offset> (comparing 'sp')
         4. // 非多重递归假设：，详情见 Visit_指令 
+        5. Lv_4 极大地扩充了 `handle_ir.cpp` 的内容，并归结出了很多好用的函数（见handle_ir.cpp开头）
+        6. 由于 `t1` 被 lw/sw/sp+- 占用了，所以其他的东西暂时还是别用 `t1`
+        7. 其实可以发现，那么多 unordered_map，其实记得都是一种东西：
+            koopa_raw_value_data 的地址
+            (1) koopa_raw_value_t 可以看成 koopa_raw_value_data 的地址
+            (2) 同样的，我们发现 koopa_raw_load_t 的地址其实就是它所属的koopa_raw_value_data地址加上一个常数
+                偏移
+            (3) 同理，koopa_raw_binary_t 也是如此，而且它们的偏移量甚至都一样。。。。
 */
 
 #pragma once

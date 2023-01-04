@@ -46,6 +46,28 @@ inline void Alloc2Register(koopa_raw_value_t addr, string reg_name){
   Offset2Register(offset, reg_name);
 }
 
+// From an Instr to the Register
+inline void Instr2Register(const koopa_raw_value_t& addr, string reg_name){
+  switch (addr->kind.tag) {
+    case KOOPA_RVT_INTEGER :
+      cout << risc_li(reg_name, addr->kind.data.integer.value) ;
+      break;
+    case KOOPA_RVT_BINARY :
+      Binary2Register((koopa_raw_binary_t* )&(addr->kind.data.binary), reg_name);
+      break;
+    case KOOPA_RVT_LOAD :
+      // Load 的 result 放到 Reg 上
+      Load2Register((koopa_raw_load_t* )&(addr->kind.data.load), reg_name);
+      break;
+    case KOOPA_RVT_ALLOC :
+      // 这个对应的局部变量的结果放到 Reg 上
+      Alloc2Register((koopa_raw_value_t)(addr), reg_name);
+      break;
+    default:
+      assert(false);
+  }
+}
+
 inline void Register2Stack(unsigned int &OFFSET, string reg_name){
   // int IMM = GetStackSize();
   if (reg_name == "t1")
@@ -75,6 +97,25 @@ inline void Register2Alloc(koopa_raw_value_t addr, string reg_name){
   Register2Stack(offset, reg_name);
 }
 
+inline void Register2Instr(const koopa_raw_value_t& addr, string reg_name){
+  switch (addr->kind.tag) {
+    case KOOPA_RVT_INTEGER :
+      assert(false);
+      break;
+    case KOOPA_RVT_BINARY :
+      assert(false);
+      break;
+    case KOOPA_RVT_LOAD :
+      assert(false);
+      break;
+    case KOOPA_RVT_ALLOC :
+      // 将 Reg 的值传到这个局部变量在栈上的位置
+      Register2Alloc((koopa_raw_value_t)(addr), reg_name);
+      break;
+    default:
+      assert(false);
+  } 
+}
 
 inline void pre_func(){
   if (stack_size <= (1<<11)){
@@ -165,48 +206,7 @@ inline void binary2risc(koopa_raw_binary_op_t optype, string o1, string o2){
   }  
 }
 
-// From an Instr to the Register
-inline void Instr2Register(const koopa_raw_value_t& addr, string reg_name){
-  switch (addr->kind.tag) {
-    case KOOPA_RVT_INTEGER :
-      cout << risc_li(reg_name, addr->kind.data.integer.value) ;
-      break;
-    case KOOPA_RVT_BINARY :
-      Binary2Register((koopa_raw_binary_t* )&(addr->kind.data.binary), reg_name);
-      break;
-    case KOOPA_RVT_LOAD :
-      // Load 的 result 放到 Reg 上
-      Load2Register((koopa_raw_load_t* )&(addr->kind.data.load), reg_name);
-      break;
-    case KOOPA_RVT_ALLOC :
-      // 这个对应的局部变量的结果放到 Reg 上
-      Alloc2Register((koopa_raw_value_t)(addr), reg_name);
-      break;
-    default:
-      assert(false);
-  }
-}
 
-inline void Register2Instr(const koopa_raw_value_t& addr, string reg_name){
-  switch (addr->kind.tag) {
-    case KOOPA_RVT_INTEGER :
-      assert(false);
-      break;
-    case KOOPA_RVT_BINARY :
-      assert(false);
-      break;
-    case KOOPA_RVT_LOAD :
-      // Load 的 result 放到 Reg 上
-      assert(false);
-      break;
-    case KOOPA_RVT_ALLOC :
-      // 这个对应的局部变量的结果放到 Reg 上
-      Register2Alloc((koopa_raw_value_t)(addr), reg_name);
-      break;
-    default:
-      assert(false);
-  } 
-}
 
 
 // ------------------------ Basic Visit ------------------------------------------------------
@@ -312,6 +312,7 @@ void Visit(const koopa_raw_value_t &value, const int mode) {
       if (!mode){
         // if (!mmp.count((koopa_raw_binary_t* )(&kind.data.binary)))
         Visit(kind.data.binary, mode); 
+        // 一次性空间
       }
       else 
         GrowStack(4);
@@ -333,6 +334,7 @@ void Visit(const koopa_raw_value_t &value, const int mode) {
         // if (!ldmmp.count((koopa_raw_load_t* )&(kind.data.load)))
         Visit(kind.data.load, mode);
         // cout << "there?" << endl;
+        // 一次性空间
       }
       else 
         GrowStack(4);
