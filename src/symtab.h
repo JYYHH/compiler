@@ -7,7 +7,7 @@
         
 */
 
-#include <map>
+#include <unordered_map>
 
 class SymbolTableItem {
  public:
@@ -25,9 +25,10 @@ class SymbolTableItem {
 
 class SymbolTable {
  public:
-    std::map < std::string, SymbolTableItem* > ST;
+    std::unordered_map < std::string, SymbolTableItem* > ST;
     std::string ST_name;
     SymbolTable *father;
+    SymbolTable *present;
 
     void Insert(std::string &name, SymbolTableItem &STitem);
     SymbolTableItem* GetItemByName(std::string &name);

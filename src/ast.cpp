@@ -11,6 +11,7 @@ using namespace std;
 string now_btype;
 int BLKID, ID_instr;
 
+// Page_Table Part------------------------------------------------------
 SymbolTable* present_tbl(){
     return (*(BaseAST::glbstst)).top();
 }   
@@ -26,6 +27,9 @@ void push_into_tbl_stk(SymbolTable* item, int has_fa){
 void pop_tbl_stk(){
     (*(BaseAST::glbstst)).pop();
 }
+
+// Page Table Part ----------------------------------------------------------
+
 
 string sj_map[40] = {
   "",
@@ -68,9 +72,26 @@ string sj_map[40] = {
   "                                                                          " 
 };
 
-// in the beginning of each line
+// Some Useful function
 inline void BaseAST :: HandleSJ(int sj) const{
     std::cout << sj_map[sj];
+}
+
+int var_num, is_01; // is_01 = 0 -> binary ; 1 -> 0/1 ; 2 -> const
+int var_ins[100005]; // an optimization on saved IR register --- save constant before
+// we save space for useless `%xx` items in IR-code, since they're all constant 
+
+
+inline void alr_compute_procedure(int NUMb){
+    var_ins[var_num ++] = NUMb, is_01 = 2;
+}
+
+inline int BaseAST :: PreComputeProcedure() const{
+    if (can_compute){ // in this condition, we handle this instr already in the parsing time.
+        alr_compute_procedure(val);
+        return 1;
+    }
+    return 0;
 }
 
 // ------------------ Dump Begin ---------------------------------------------
@@ -478,12 +499,6 @@ void BlockItemAST :: IRDump() const {
         stmt->IRDump();
 }
 
-
-int var_num, is_01; // is_01 = 0 -> binary ; 1 -> 0/1 ; 2 -> const
-int var_ins[100005]; // an optimization on saved IR register --- save constant before
-
-// we save space for useless `%xx` items in IR-code, since they're all constant 
-
 void StmtAST :: IRDump() const {
     // var_num = 0;
     if (sel == 1){
@@ -502,10 +517,18 @@ void StmtAST :: IRDump() const {
             return;
         exp->IRDump();
         // store %1, @x
-        std::cout << "    store %" << var_num - 1 << ", @" << present_tbl()->ST_name << '_' << lval << endl;
+
+        string alter_one = lval;
+        present_tbl()->GetItemByName(alter_one);
+        if(is_01 >> 1)
+            std::cout << "    store " << var_ins[var_num - 1] << ", @" << present_tbl()->present->ST_name << '_' << lval << endl;
+        else
+            std::cout << "    store %" << var_num - 1 << ", @" << present_tbl()->present->ST_name << '_' << lval << endl;
         // And you can consider why there's not other condition?
         // BBBBBecause, all the tree nodes' 'can_compute' are already determined, after `sysy.y`
             // scans the source code.
+
+        // But I finally add this function, mainly for testing my code, without pre-compiling tech
     }
 }
 
@@ -524,10 +547,6 @@ inline void out_binary_IR(int fi, int se, string op, int is_01_fi = 0, int is_01
     //---------------- Expression Part--------------------------------
     // Only after executing Logic and Comparing Operating, we can manipulate a value into 0/1
 
-inline void alr_compute_procedure(int NUMb){
-    var_ins[var_num ++] = NUMb, is_01 = 2;
-}
-
 inline void bin201(){
     if (is_01 == 0){
         std::cout << "    %" << var_num << " = ne 0, %" << var_num - 1 << endl;
@@ -540,18 +559,12 @@ inline void bin201(){
 }
 
 void ExpAST :: IRDump() const {
-    if (can_compute){
-        alr_compute_procedure(val);
-        return;
-    }
+    if (PreComputeProcedure()) return;
     
     lorexp->IRDump();
 }
 void LOrExpAST :: IRDump() const {
-    if (can_compute){
-        alr_compute_procedure(val);
-        return;
-    }
+    if (PreComputeProcedure()) return;
 
     if (sel == 0)
         landexp->IRDump();
@@ -566,10 +579,7 @@ void LOrExpAST :: IRDump() const {
     }
 }
 void LAndExpAST :: IRDump() const {
-    if (can_compute){
-        alr_compute_procedure(val);
-        return;
-    }
+    if (PreComputeProcedure()) return;
 
     if (sel == 0)
         eqexp->IRDump();
@@ -584,10 +594,7 @@ void LAndExpAST :: IRDump() const {
     }
 }
 void EqExpAST :: IRDump() const {
-    if (can_compute){
-        alr_compute_procedure(val);
-        return;
-    }
+    if (PreComputeProcedure()) return;
 
     if (sel == 0)
         relexp->IRDump();
@@ -603,10 +610,7 @@ void EqExpAST :: IRDump() const {
     }
 }
 void RelExpAST :: IRDump() const {
-    if (can_compute){
-        alr_compute_procedure(val);
-        return;
-    }
+    if (PreComputeProcedure()) return;
 
     if (sel == 0)
         addexp->IRDump();
@@ -628,10 +632,7 @@ void RelExpAST :: IRDump() const {
     }
 }
 void AddExpAST :: IRDump() const {
-    if (can_compute){
-        alr_compute_procedure(val);
-        return;
-    }
+    if (PreComputeProcedure()) return;
 
     if (sel == 0)
         mulexp->IRDump();
@@ -647,10 +648,7 @@ void AddExpAST :: IRDump() const {
     }
 }
 void MulExpAST :: IRDump() const {
-    if (can_compute){
-        alr_compute_procedure(val);
-        return;
-    }
+    if (PreComputeProcedure()) return;
 
     if (sel == 0)
         unaryexp->IRDump();
@@ -668,10 +666,7 @@ void MulExpAST :: IRDump() const {
     }
 }
 void UnaryExpAST :: IRDump() const {
-    if (can_compute){
-        alr_compute_procedure(val);
-        return;
-    }
+    if (PreComputeProcedure()) return;
 
     if (sel == 0)
         pexp->IRDump();
@@ -694,28 +689,30 @@ void UnaryExpAST :: IRDump() const {
     }
 }
 void PrimaryExpAST :: IRDump() const {
-    if (can_compute){
-        alr_compute_procedure(val);
-        return;
-    }
+    if (PreComputeProcedure()) return;
 
     if (sel == 0)
         exp->IRDump();
     else if (sel == 2){
         // %0 = load @x
-        std::cout << "    %" << var_num << " = load @" << present_tbl()->ST_name << '_' << lval << endl;
+        string alter_one = lval;
+        auto ret = present_tbl()->GetItemByName(alter_one);
+        if (!(ret->VarType() & 1)){
+            alr_compute_procedure(ret->VarVal());
+            return;
+        }
+        std::cout << "    %" << var_num << " = load @" << present_tbl()->present->ST_name << '_' << lval << endl;
         var_num ++, is_01 = 0;
     }
+    else 
+        alr_compute_procedure(val);
 }
 
 
 // --------------------------------- Lv_4  Const and Var-------------------------------------
 
 void InitValAST :: IRDump() const {
-    if (can_compute){
-        alr_compute_procedure(val);
-        return;
-    }
+    if (PreComputeProcedure()) return;
     
     exp->IRDump();
 }
@@ -764,13 +761,17 @@ std::string btype_transfer(std::string &BTYPE){
 void VarDefAST :: IRDump() const {
     //@x = alloc i32
     std::cout << "    @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << endl;
-    
+    // 保证 ident 在当前 symbol table 里
     if (can_compute)
         std::cout << "    store " << val << ", @" << present_tbl()->ST_name << '_' << ident << endl;
     else if (sel){
         initval->IRDump();
         // The same as case in StmtAST, we can make sure this can't be a constant
-        std::cout << "    store %" << var_num - 1 << ", @" << present_tbl()->ST_name << '_' << ident << endl;
+        // Also finally implemented such a f**k if, for debugging
+        if(is_01 >> 1)
+            std::cout << "    store " << var_ins[var_num - 1] << ", @" << present_tbl()->ST_name << '_' << ident << endl;
+        else
+            std::cout << "    store %" << var_num - 1 << ", @" << present_tbl()->ST_name << '_' << ident << endl;
     }
 }
 

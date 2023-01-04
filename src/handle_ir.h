@@ -5,8 +5,11 @@
             - 每条指令对应一个 Reg，指令执行完存在对应的 Reg里
             - 这个映射关系用一个 map 维护, 其中 key 是 koopa_raw_binary_t* 类型的
             - 如果 lhs or rhs 有用到寄存器，那么直接引用；否则把立即数 li 到 a1/a2 里
-        
-        
+        3. Now in Lv_4, we need to change all the local vars
+            from Registers to Stack,
+
+          Now it's      <Instr> -> <offset> (comparing 'sp')
+        4. 
 */
 
 #pragma once
@@ -14,15 +17,15 @@
 #include "koopa.h"
 
 // Basic Visit Function (Walk Through Koopa Tree in a recursion type)
-void Visit(const koopa_raw_program_t &program);
-void Visit(const koopa_raw_slice_t &slice);
-void Visit(const koopa_raw_function_t &func);
-void Visit(const koopa_raw_basic_block_t &bb);
-void Visit(const koopa_raw_value_t &value);
+void Visit(const koopa_raw_program_t &program, const int mode);
+void Visit(const koopa_raw_slice_t &slice, const int mode);
+void Visit(const koopa_raw_function_t &func, const int mode);
+void Visit(const koopa_raw_basic_block_t &bb, const int mode);
+void Visit(const koopa_raw_value_t &value, const int mode);
 // ------------------------ `koopa_raw_value_t` Visit ------------------------------------------------------
-void Visit(const koopa_raw_return_t &ret);
-void Visit(const koopa_raw_integer_t &INT);
-void Visit(const koopa_raw_binary_t &BinOP);
+void Visit(const koopa_raw_return_t &ret, const int mode);
+void Visit(const koopa_raw_integer_t &INT, const int mode);
+void Visit(const koopa_raw_binary_t &BinOP, const int mode);
 
 int handle_str_ir(const char *str);
 

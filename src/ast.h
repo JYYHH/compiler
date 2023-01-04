@@ -45,6 +45,10 @@
 
         10. `Can't be this format?` 记录了在 IR 中打tag的失败尝试
 
+        11. 想取消4.这个技术也很简单，直接将所有 can_compute 后面加上 == 2 即可
+
+
+
 
     
     To-Do :
@@ -64,6 +68,7 @@ class BaseAST {
   virtual void IRDump() const = 0;
   inline void HandleSJ(int sj) const ;
   int can_compute /* can be computed in compiling time ? both for exp and valueing stmt */, val;
+  inline int PreComputeProcedure() const;
   /*
   Already can_compute implemented can_compute TYPE:
     Stmt
