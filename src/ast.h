@@ -80,7 +80,7 @@ class BaseAST {
 
 // Useful functions
 SymbolTable* present_tbl();
-void push_into_tbl_stk(SymbolTable* item);
+void push_into_tbl_stk(SymbolTable* item, int has_fa);
 void pop_tbl_stk();
 std::string btype_transfer(std::string &BTYPE);
 

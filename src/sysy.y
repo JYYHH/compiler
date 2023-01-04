@@ -60,7 +60,7 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
 CompUnit
   : { 
     BaseAST::glbsymbtl->ST_name = "GLOBAL_Table";
-    push_into_tbl_stk( BaseAST::glbsymbtl ); // 全局变量表进入
+    push_into_tbl_stk( BaseAST::glbsymbtl, 0); // 全局变量表进入
   }
    FuncDef {
     auto comp_unit = make_unique<CompUnitAST>();
@@ -99,7 +99,7 @@ Block
     BLKast->symbtl = new SymbolTable();
     BLKast->symbtl->ST_name = "block_" + std::to_string(total_blk_num);
     blk_st.push(BLKast);
-    push_into_tbl_stk(BLKast->symbtl); // 这个 Block 的符号表进入
+    push_into_tbl_stk(BLKast->symbtl, 1); // 这个 Block 的符号表进入
   }
    '{' Block_inter '}' {
     auto BLKast = blk_st.top();
@@ -112,7 +112,12 @@ Block
   ;
 
 Stmt
-  : RETURN Exp ';' {
+  : 
+  // {
+  //   // Check Something
+  //   std::cout << "Down here?" << endl;
+  // }
+  RETURN Exp ';' {
     auto ast = new StmtAST();
     ast->exp = unique_ptr<BaseAST>($2);
     ast->sel = 1;
@@ -447,6 +452,7 @@ PrimaryExp
     $$ = ast;
   }
   | LVal {
+    // std::cout << (*(BaseAST::glbstst)).size() << std::endl;
     auto ast = new PrimaryExpAST();
     ast->sel = 2;
     ast->lval = *unique_ptr<string>($1);

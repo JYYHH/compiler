@@ -15,8 +15,11 @@ SymbolTable* present_tbl(){
     return (*(BaseAST::glbstst)).top();
 }   
 
-void push_into_tbl_stk(SymbolTable* item){
-    item->father = present_tbl();
+void push_into_tbl_stk(SymbolTable* item, int has_fa){
+    if (has_fa)
+        item->father = present_tbl();
+    else 
+        item->father = NULL;
     (*(BaseAST::glbstst)).push(item);
 }
 
@@ -430,7 +433,7 @@ void VarDeclAST :: Dump(int sj) const {
 // ---------------------Begin the Part of Generting the IR (koopa)---------------------------------
 
 void CompUnitAST :: IRDump() const{
-    push_into_tbl_stk(glbsymbtl);
+    push_into_tbl_stk(glbsymbtl, 0);
     func_def->IRDump();
     pop_tbl_stk();
 }
@@ -445,7 +448,7 @@ void FuncTypeAST :: IRDump() const {
         std::cout << "i32";
 }
 void BlockAST :: IRDump() const {
-    push_into_tbl_stk(symbtl);
+    push_into_tbl_stk(symbtl, 1);
 
     std::cout << " {" << endl;
     // list the basic block here further?
@@ -462,7 +465,7 @@ void BlockAST :: IRDump() const {
 }
 
 void BlockItemAST :: IRDump() const {
-    std::cout << " %" << "Instr_" << ID_instr << "FromBlock_" << BLKID << ": " << endl;
+    std::cout << " %" << "Instr_" << ID_instr << "_FromBlock_" << BLKID << ": " << endl;
     if (sel == 0)
         decl->IRDump();
     else 

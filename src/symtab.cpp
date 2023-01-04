@@ -26,6 +26,6 @@ void SymbolTable :: Insert(std::string &name, SymbolTableItem &STitem){
 SymbolTableItem* SymbolTable :: GetItemByName(std::string &name){
     for(SymbolTable* now = this; now; now = now->father)
         if (now->ST.count(name))
-            now->ST[name];
+            return now->ST[name];
     return NULL;
 }
