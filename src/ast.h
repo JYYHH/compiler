@@ -43,6 +43,8 @@
         8. 我们假定，Lv_3 中 binary operator 的返回值都是在 形如 `%num` 这样的变量里的
         9. 我们假定，IR code里，变量的名称总是 @<ST_name>_<var_name>
 
+        10. `Can't be this format?` 记录了在 IR 中打tag的失败尝试
+
 
     
     To-Do :

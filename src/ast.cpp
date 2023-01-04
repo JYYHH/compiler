@@ -453,7 +453,11 @@ void BlockAST :: IRDump() const {
     std::cout << " {" << endl;
     // list the basic block here further?
     std::vector< std::unique_ptr<BaseAST> > &now_vec = *blockitem; 
-    std::cout << " %" << "Block " << block_id << ": " << endl;
+
+    std::cout << " %" << "entry:" << endl;
+    // std::cout << " %" << "Block_" << block_id << ": " << endl;
+    // Can't be this format?
+
     for (int i=0;i<child_num;i++){
         BLKID = block_id;
         ID_instr = i;
@@ -465,7 +469,9 @@ void BlockAST :: IRDump() const {
 }
 
 void BlockItemAST :: IRDump() const {
-    std::cout << " %" << "Instr_" << ID_instr << "_FromBlock_" << BLKID << ": " << endl;
+    // std::cout << " %" << "Instr_" << ID_instr << "_FromBlock_" << BLKID << ": " << endl;
+    // Can't be this format?
+
     if (sel == 0)
         decl->IRDump();
     else 
