@@ -9,7 +9,7 @@
             from Registers to Stack,
 
           Now it's      <Instr> -> <offset> (comparing 'sp')
-        4. 
+        4. // 非多重递归假设：，详情见 Visit_指令 
 */
 
 #pragma once
@@ -26,6 +26,9 @@ void Visit(const koopa_raw_value_t &value, const int mode);
 void Visit(const koopa_raw_return_t &ret, const int mode);
 void Visit(const koopa_raw_integer_t &INT, const int mode);
 void Visit(const koopa_raw_binary_t &BinOP, const int mode);
+void Visit(const koopa_raw_load_t &LoadOP, const int mode);
+void Visit(const koopa_raw_store_t &StoreOP, const int mode);
+
 
 int handle_str_ir(const char *str);
 
@@ -71,5 +74,5 @@ int handle_str_ir(const char *str);
 
 
 // 杂：Other Functions
-// inline string Binary2Register(koopa_raw_binary_t* addr);  ------> 从Binary Instr Addr 到 Reg_Name 的映射
-// inline void binary2risc(koopa_raw_binary_op_t optype, string o1, string o2);  ----> Binary Instr 到 riscv代码映射
+// inline string Binary2Register(koopa_raw_binary_t* addr);  
+// inline void binary2risc(koopa_raw_binary_op_t optype, string o1, string o2); 
