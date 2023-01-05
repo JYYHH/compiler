@@ -78,7 +78,19 @@
         13. 对于 OptionalExp 的处理，请参考 `sysy.y` 中 // Cheat Code Again
           总的来说我们就是，因为这个语句没有任何后效性，所以我们直接当 can_compute == 1 的来处理
           
-
+        14. Lv_5 中对 SymbleTable 的一点改进：
+          - 原先没有考虑到一个 Block 中定义和使用顺序先后的问题，例子：
+                                          {
+                                            int x = 1;
+                                            {
+                                              cout << x = x + 2 << endl;
+                                              int x = 6;
+                                              cout << x << endl;
+                                            }
+                                          }
+          - 这种情况是没有问题的，于是我们还是需要在parsing的过程中，预处理出每一个Lval所属的符号表
+            （这个是不难的），到时候直接从那里面取就可以了（
+        
 
     
     To-Do :

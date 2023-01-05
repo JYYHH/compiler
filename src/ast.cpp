@@ -9,7 +9,7 @@
 using namespace std;
 
 string now_btype;
-int BLKID, ID_instr;
+int BLKID, ID_instr, Func_Ret;
 
 // Page_Table Part------------------------------------------------------
 SymbolTable* present_tbl(){
@@ -483,7 +483,10 @@ void FuncDefAST :: IRDump() const {
 
     std::cout << " {" << endl;
     std::cout << " %" << "entry:" << endl;
+    Func_Ret = 0;
     block->IRDump();
+    if (Func_Ret == 0)
+        std::cout << "   ret" << endl;
     std::cout << "}" << endl;
 }
 void FuncTypeAST :: IRDump() const {
@@ -522,6 +525,8 @@ void BlockItemAST :: IRDump() const {
 void StmtAST :: IRDump() const {
     // var_num = 0;
     if (sel == 3){
+        Func_Ret ++;
+        if (Func_Ret > 1) return;
         if (can_compute == 2)
             std::cout << "    ret " << val << endl;
         else{
