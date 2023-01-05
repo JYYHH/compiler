@@ -49,7 +49,8 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
 // 常量和变量定义
 %type <ast_val> Decl BlockItem InitVal ConstExp VarDef VarDecl 
 %type <ast_val> ConstInitVal ConstDef ConstDecl
-
+// Lv_5 块儿定义
+%type <ast_val> OptionalExp
 
 %type <str_val> LVal BType
 %type <int_val> Number
@@ -117,14 +118,14 @@ Stmt
   //   // Check Something
   //   std::cout << "Down here?" << endl;
   // }
-  RETURN Exp ';' {
+  RETURN OptionalExp ';' {
     auto ast = new StmtAST();
-    ast->exp = unique_ptr<BaseAST>($2);
-    ast->sel = 1;
+    ast->optionalexp = unique_ptr<BaseAST>($2);
+    ast->sel = 3;
 
-    ast->can_compute = ast->exp->can_compute;
+    ast->can_compute = ast->optionalexp->can_compute;
     if (ast->can_compute)
-      ast->val = ast->exp->val;
+      ast->val = ast->optionalexp->val;
 
     $$ = ast;
   }
@@ -153,6 +154,25 @@ Stmt
       ast->val = ast->exp->val;
       ret->SetVal(ast->val);
     }
+    $$ = ast;
+  }
+  | OptionalExp ';' {
+    auto ast = new StmtAST();
+    ast->optionalexp = unique_ptr<BaseAST>($1);
+    ast->sel = 1;
+
+    ast->can_compute = ast->optionalexp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->optionalexp->val;
+
+    $$ = ast;
+  }
+  | Block {
+    auto ast = new StmtAST();
+    ast->sel = 2;
+    ast->block = unique_ptr<BaseAST>($1);
+
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -685,6 +705,29 @@ ConstDecl_inter
   }
   ;
 
+//--------------------------------- Lv 5 ----------------------------------
+
+OptionalExp
+  : Exp {
+    auto ast = new OptionalExpAST();
+    ast->exp = unique_ptr<BaseAST>($1);
+    // Pre-Compute Tech
+    ast->can_compute = ast->exp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->exp->val;
+    //
+    $$ = ast;
+  }
+  | {
+    auto ast = new OptionalExpAST();
+    ast->exp = NULL;
+    ast->can_compute = 1;
+    ast->val = 0;
+    // Cheat Code
+
+    $$ = ast;
+  }
+  ;
 
 %%
 

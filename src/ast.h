@@ -75,7 +75,9 @@
         12. Stmt 中的赋值语句千万不能在 sysy.y 中处理，不然就寄了！( 因为赋值是要随着程序的进行而进行的 )
           但等式右边是常数的倒是可以先处理?
 
-
+        13. 对于 OptionalExp 的处理，请参考 `sysy.y` 中 // Cheat Code Again
+          总的来说我们就是，因为这个语句没有任何后效性，所以我们直接当 can_compute == 1 的来处理
+          
 
 
     
@@ -157,7 +159,7 @@ class BlockAST : public BaseAST {
 
 class StmtAST : public BaseAST {
  public:
-  std::unique_ptr<BaseAST> exp;
+  std::unique_ptr<BaseAST> exp, optionalexp, block;
   std::string lval;
   int sel;
   void Dump(int sj) const override;
@@ -350,6 +352,15 @@ class VarDeclAST : public BaseAST {
 };
 
 
+
+//  ------------------------ Lv_5 Blocks -----------------------
+
+class OptionalExpAST : public BaseAST {
+ public:
+  std::unique_ptr<BaseAST> exp;
+  void Dump(int sj) const override;
+  void IRDump() const override;
+};
 
 
 // Number 在 "sysy.y" 中定义的类型直接是 int_val 而不是 ast_val，所以不需要语法树类型

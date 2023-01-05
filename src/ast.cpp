@@ -87,7 +87,7 @@ inline void alr_compute_procedure(int NUMb){
 }
 
 inline int BaseAST :: PreComputeProcedure() const{
-    if (can_compute){ // in this condition, we handle this instr already in the parsing time.
+    if (can_compute == 2){ // in this condition, we handle this instr already in the parsing time.
         alr_compute_procedure(val);
         return 1;
     }
@@ -139,10 +139,16 @@ void BlockAST :: Dump(int sj) const {
 void StmtAST :: Dump(int sj) const {
     HandleSJ(sj);
     std::cout << "StmtAST {" <<endl;
-    if (sel == 1){
+    if (sel == 3){
         HandleSJ(sj+1);
         std::cout << "return" << endl;
-        exp->Dump(sj + 1);
+        optionalexp->Dump(sj + 1);
+    }
+    else if (sel == 2){
+        block->Dump(sj + 1);
+    }
+    else if (sel == 1){
+        optionalexp->Dump(sj + 1);
     }
     else{
         HandleSJ(sj+1);
@@ -447,6 +453,18 @@ void VarDeclAST :: Dump(int sj) const {
     std::cout << "}";
 }
 
+void OptionalExpAST :: Dump(int sj) const {
+    HandleSJ(sj);
+    std::cout << "OptionalExpAST {" <<endl; 
+
+    if (exp != NULL)
+        exp->Dump(sj + 1);
+
+    std::cout << endl;
+    HandleSJ(sj);
+    std::cout << "}";
+}
+
 
 // ------------------ Dump End ---------------------------------------------
 
@@ -462,7 +480,11 @@ void FuncDefAST :: IRDump() const {
     std::cout << "fun @";
     std::cout << ident << "(): ";
     func_type->IRDump();
+
+    std::cout << " {" << endl;
+    std::cout << " %" << "entry:" << endl;
     block->IRDump();
+    std::cout << "}" << endl;
 }
 void FuncTypeAST :: IRDump() const {
     if (type == "int")
@@ -471,11 +493,10 @@ void FuncTypeAST :: IRDump() const {
 void BlockAST :: IRDump() const {
     push_into_tbl_stk(symbtl, 1);
 
-    std::cout << " {" << endl;
     // list the basic block here further?
     std::vector< std::unique_ptr<BaseAST> > &now_vec = *blockitem; 
 
-    std::cout << " %" << "entry:" << endl;
+    
     // std::cout << " %" << "Block_" << block_id << ": " << endl;
     // Can't be this format?
 
@@ -484,7 +505,6 @@ void BlockAST :: IRDump() const {
         ID_instr = i;
         now_vec[i]->IRDump();
     }
-    std::cout << "}" << endl;
 
     pop_tbl_stk();
 }
@@ -501,19 +521,19 @@ void BlockItemAST :: IRDump() const {
 
 void StmtAST :: IRDump() const {
     // var_num = 0;
-    if (sel == 1){
-        if (can_compute)
+    if (sel == 3){
+        if (can_compute == 2)
             std::cout << "    ret " << val << endl;
         else{
-            exp->IRDump();
+            optionalexp->IRDump();
             if(is_01 >> 1)
                 std::cout << "    ret " << var_ins[var_num - 1] << endl;
             else
                 std::cout << "    ret %" << var_num - 1 << endl;
         }
     }
-    else{
-        if (can_compute){
+    else if (sel == 0){
+        if (can_compute == 2){
             // can be ignored, the reason is so fancy... See the comment on the top of 'ast.h'
 
             // string alter_one = lval;
@@ -532,11 +552,16 @@ void StmtAST :: IRDump() const {
         else
             std::cout << "    store %" << var_num - 1 << ", @" << present_tbl()->present->ST_name << '_' << lval << endl;
         // And you can consider why there's not other condition?
-        // BBBBBecause, all the tree nodes' 'can_compute' are already determined, after `sysy.y`
+        // BBBBBecause, all the tree nodes' 'can_compute == 2' are already determined, after `sysy.y`
             // scans the source code.
 
         // But I finally add this function, mainly for testing my code, without pre-compiling tech
     }
+    else if (sel == 1){
+        // 这种情况甚至不用 generate code
+    }
+    else
+        block->IRDump();
 }
 
 inline void out_binary_IR(int fi, int se, string op, int is_01_fi = 0, int is_01_se = 0){
@@ -769,7 +794,7 @@ void VarDefAST :: IRDump() const {
     //@x = alloc i32
     std::cout << "    @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << endl;
     // 保证 ident 在当前 symbol table 里
-    if (can_compute)
+    if (can_compute == 2)
         std::cout << "    store " << val << ", @" << present_tbl()->ST_name << '_' << ident << endl;
     else if (sel){
         initval->IRDump();
@@ -782,6 +807,13 @@ void VarDefAST :: IRDump() const {
     }
 }
 
+
+// ------------------------------------ Lv 5 Block -------------------
+
+void OptionalExpAST :: IRDump() const {
+    if (PreComputeProcedure()) return;
+    exp->IRDump();
+}
 
 
 // %0 = load @x
