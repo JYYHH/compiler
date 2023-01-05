@@ -218,6 +218,10 @@ LOrExp
     ast->can_compute = ast->lorexp->can_compute && ast->landexp->can_compute;
     if (ast->can_compute)
         ast->val = ast->lorexp->val || ast->landexp->val;
+    else if (ast->lorexp->can_compute && ast->lorexp->val)
+      ast->can_compute = ast->val = 1;
+    else if (ast->landexp->can_compute && ast->landexp->val)
+      ast->can_compute = ast->val = 1;
     //
 
     $$ = ast;
@@ -248,6 +252,10 @@ LAndExp
     ast->can_compute = ast->landexp->can_compute && ast->eqexp->can_compute;
     if (ast->can_compute)
         ast->val = ast->landexp->val && ast->eqexp->val;
+    else if (ast->eqexp->can_compute && !ast->eqexp->val)
+      ast->can_compute = 1, ast->val = 0;
+    else if (ast->landexp->can_compute && !ast->landexp->val)
+      ast->can_compute = 1, ast->val = 0;
     //
 
     $$ = ast;

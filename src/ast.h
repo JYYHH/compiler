@@ -95,6 +95,8 @@
           - 这种情况是没有问题的，于是我们还是需要在parsing的过程中，预处理出每一个Lval所属的符号表
             （这个是不难的），到时候直接从那里面取就可以了（
         
+        15. How to Handle `if-else`
+        
 
     
     To-Do :
@@ -103,7 +105,7 @@
 
 */
 
-#define MODE 2 // 2 为关掉优化的模式，1为优化模式
+#define MODE 1 // 2 为关掉优化的模式，1为优化模式
 
 class BaseAST {
  public:
