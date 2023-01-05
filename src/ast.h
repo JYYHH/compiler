@@ -161,6 +161,7 @@ class StmtAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> exp, optionalexp, block;
   std::string lval;
+  SymbolTable *lval_belong;
   int sel;
   void Dump(int sj) const override;
   void IRDump() const override;
@@ -254,6 +255,7 @@ class PrimaryExpAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> exp;
   std::string lval;
+  SymbolTable *lval_belong;
   int number;
   int sel;
   void Dump(int sj) const override;

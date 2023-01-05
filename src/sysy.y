@@ -138,6 +138,8 @@ Stmt
     auto pres_symbtl = present_tbl();
     // Check whether something wrong?
     auto ret = pres_symbtl->GetItemByName(ast->lval);
+    ast->lval_belong = pres_symbtl->present;
+
     if (ret == NULL)
       exit(4);
     if (!(ret->VarType() & 1))
@@ -483,6 +485,7 @@ PrimaryExp
     // CAN'T PRECOMPUTE, if and only if it hasn't been computed
     auto pres_symbtl = present_tbl();
     auto ret = pres_symbtl->GetItemByName(ast->lval);
+    ast->lval_belong = pres_symbtl->present;
     if (ret == NULL)
       exit(4);
     

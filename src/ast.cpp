@@ -546,11 +546,14 @@ void StmtAST :: IRDump() const {
         // store %1, @x
 
         string alter_one = lval;
-        present_tbl()->GetItemByName(alter_one);
+        lval_belong->GetItemByName(alter_one);
+
+        // cout << "STMT Belong to Block: " << lval_belong->ST_name << endl;
+
         if(is_01 >> 1)
-            std::cout << "    store " << var_ins[var_num - 1] << ", @" << present_tbl()->present->ST_name << '_' << lval << endl;
+            std::cout << "    store " << var_ins[var_num - 1] << ", @" << lval_belong->present->ST_name << '_' << lval << endl;
         else
-            std::cout << "    store %" << var_num - 1 << ", @" << present_tbl()->present->ST_name << '_' << lval << endl;
+            std::cout << "    store %" << var_num - 1 << ", @" << lval_belong->present->ST_name << '_' << lval << endl;
         // And you can consider why there's not other condition?
         // BBBBBecause, all the tree nodes' 'can_compute == 2' are already determined, after `sysy.y`
             // scans the source code.
@@ -728,12 +731,13 @@ void PrimaryExpAST :: IRDump() const {
     else if (sel == 2){
         // %0 = load @x
         string alter_one = lval;
-        auto ret = present_tbl()->GetItemByName(alter_one);
+        auto ret = lval_belong->GetItemByName(alter_one);
+        // cout << "PrimaryExpAST Belong to Block: " << lval_belong->ST_name << endl;
         if (!(ret->VarType() & 1)){
             alr_compute_procedure(ret->VarVal());
             return;
         }
-        std::cout << "    %" << var_num << " = load @" << present_tbl()->present->ST_name << '_' << lval << endl;
+        std::cout << "    %" << var_num << " = load @" << lval_belong->present->ST_name << '_' << lval << endl;
         var_num ++, is_01 = 0;
     }
     else 
