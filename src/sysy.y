@@ -51,6 +51,8 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
 %type <ast_val> ConstInitVal ConstDef ConstDecl
 // Lv_5 块儿定义
 %type <ast_val> OptionalExp
+// Lv_6 If-else
+%type <ast_val> IfStmt IfElseStmt
 
 %type <str_val> LVal BType
 %type <int_val> Number
@@ -99,18 +101,84 @@ Block
     BLKast->block_id = total_blk_num;
     BLKast->symbtl = new SymbolTable();
     BLKast->symbtl->ST_name = "block_" + std::to_string(total_blk_num);
-    blk_st.push(BLKast);
     push_into_tbl_stk(BLKast->symbtl, 1); // 这个 Block 的符号表进入
+    BLKast->symbtl->reach_st.push(1); // 
+    blk_st.push(BLKast);
   }
    '{' Block_inter '}' {
     auto BLKast = blk_st.top();
     BLKast->blockitem = ($3);
     BLKast->child_num = (int)(*(BLKast->blockitem)).size();
-    pop_tbl_stk(); // 这个 Block 的符号表退出
     blk_st.pop();
+    BLKast->symbtl->reach_st.pop();
+    pop_tbl_stk(); // 这个 Block 的符号表退出
+
     $$ = BLKast;
   }
   ;
+
+IfStmt
+  : IF '(' Exp {
+    auto temp = unique_ptr<BaseAST>($3);
+    present_tbl()->Push(!!temp->can_compute, !!temp->val);
+  } ')' IfStmt {
+    present_tbl()->Pop();
+
+    auto ast = new IfStmtAST();
+    ast->sel = 0;
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->ifstmt = unique_ptr<BaseAST>($6);
+
+    // Pre-Compute
+    ast->can_compute = ast->exp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->exp->val;
+
+    $$ = ast;
+  }
+  | IfElseStmt {
+    auto ast = new IfStmtAST();
+    ast->sel = 1;
+    ast->ifelsestmt = unique_ptr<BaseAST>($1);
+    ast->can_compute = 1;
+
+    $$ = ast;
+  }
+  ;
+
+IfElseStmt
+  : IF '(' Exp {
+    auto temp = unique_ptr<BaseAST>($3);
+    present_tbl()->Push(!!temp->can_compute, !!temp->val);
+  } ')' IfElseStmt {
+    present_tbl()->Pop();
+    auto temp = unique_ptr<BaseAST>($3);
+    present_tbl()->Push(!!temp->can_compute, !temp->val);
+  } ELSE IfElseStmt {
+    present_tbl()->Pop();
+    auto ast = new IfElseStmtAST();
+    ast->sel = 0;
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->ifelsestmtl = unique_ptr<BaseAST>($6);
+    ast->ifelsestmtr = unique_ptr<BaseAST>($9);
+
+    // Pre-Compute
+    ast->can_compute = ast->exp->can_compute;
+    if (ast->can_compute)
+      ast->val = ast->exp->val;
+
+    $$ = ast;
+  }
+  | Stmt {
+    auto ast = new IfElseStmtAST();
+    ast->sel = 1;
+    ast->stmt = unique_ptr<BaseAST>($1);
+    ast->can_compute = 1;
+
+    $$ = ast;
+  }
+  ;
+
 
 Stmt
   : 
@@ -129,7 +197,7 @@ Stmt
 
     $$ = ast;
   }
-  | LVal '=' Exp ';' {
+  | LVal '=' Exp ';' { // 赋值语句是最麻烦的
     auto ast = new StmtAST();
     ast->exp = unique_ptr<BaseAST>($3);
     ast->lval = *unique_ptr<string>($1);
@@ -145,16 +213,26 @@ Stmt
     if (!(ret->VarType() & 1))
       exit(6);
 
-    // Changing the Mode of a Var
-    if (ast->exp->can_compute == 0){
+    // Changing the Mode of a Var, into unknown state
+    // See comments in the top of `ast.h` for details
+    if (ast->exp->can_compute == 0 || pres_symbtl->present_state == 2){
       ast->can_compute = 0;
       ret->BecomeUnknown();
       // waiting computing it on the stack
     }
+    // Conditions below has 'exp' 's attribute `can_compute = 1`
     else{
-      ast->can_compute = 1;
-      ast->val = ast->exp->val;
-      ret->SetVal(ast->val);
+      if (pres_symbtl->present_state){
+        ast->can_compute = 1;
+        ast->val = ast->exp->val;
+        ret->SetVal(ast->val);
+      }
+      else{
+        // We just do nothing,
+        // First reason is that this AST element can't be accessed when generating IR,
+          // So it doesn't make sense whether you do anything here.
+        // Second is that, no consequence can be pushed onto the Symbol Table
+      }
     }
     $$ = ast;
   }
@@ -584,9 +662,9 @@ BlockItem
     ast->sel = 0;
     $$ = ast;
   }
-  | Stmt {
+  | IfStmt {
     auto ast = new BlockItemAST();
-    ast->stmt = unique_ptr<BaseAST>($1);
+    ast->ifstmt = unique_ptr<BaseAST>($1);
     ast->sel = 1;
     $$ = ast;
   }

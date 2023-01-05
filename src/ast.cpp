@@ -13,9 +13,22 @@
 */
 
 using namespace std;
+#define Pr pair<int,int> 
+
+// Block Info & Func Ret
+stack< Pr > blk_info;
+#define PUSH(x,y) blk_info.push(Pr(x,y))
+#define POP blk_info.pop()
+#define TOP blk_info.top()
 
 string now_btype;
 int BLKID, ID_instr, Func_Ret;
+
+inline void UPDATE(){
+    P &u = TOP;
+    BLKID = u.first;
+    ID_instr = u.second;
+}
 
 // Page_Table Part------------------------------------------------------
 SymbolTable* present_tbl(){
@@ -347,7 +360,7 @@ void BlockItemAST :: Dump(int sj) const {
     if (sel == 0)
         decl->Dump(sj + 1);
     else
-        stmt->Dump(sj + 1);
+        ifstmt->Dump(sj + 1);
 
     std::cout << endl;
     HandleSJ(sj);
@@ -471,6 +484,14 @@ void OptionalExpAST :: Dump(int sj) const {
     std::cout << "}";
 }
 
+void IfStmtAST :: Dump(int sj) const{
+
+}
+
+void IfElseStmtAST :: Dump(int sj) const {
+
+}
+
 
 // ------------------ Dump End ---------------------------------------------
 
@@ -510,9 +531,9 @@ void BlockAST :: IRDump() const {
     // Can't be this format?
 
     for (int i=0;i<child_num;i++){
-        BLKID = block_id;
-        ID_instr = i;
+        PUSH(block_id, i);
         now_vec[i]->IRDump();
+        POP;
     }
 
     pop_tbl_stk();
@@ -525,7 +546,7 @@ void BlockItemAST :: IRDump() const {
     if (sel == 0)
         decl->IRDump();
     else 
-        stmt->IRDump();
+        ifstmt->IRDump();
 }
 
 void StmtAST :: IRDump() const {
@@ -545,11 +566,9 @@ void StmtAST :: IRDump() const {
     }
     else if (sel == 0){
         if (can_compute == MODE){
-            // can be ignored, the reason is so fancy... See the comment on the top of 'ast.h'
-
-            // string alter_one = lval;
-            // present_tbl()->GetItemByName(alter_one);
-            // std::cout << "    store " << val << ", @" << present_tbl()->present->ST_name << '_' << lval << endl;
+            string alter_one = lval;
+            present_tbl()->GetItemByName(alter_one);
+            std::cout << "    store " << val << ", @" << present_tbl()->present->ST_name << '_' << lval << endl;
             return;
         }
 
@@ -810,6 +829,7 @@ void VarDefAST :: IRDump() const {
     std::cout << "    @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << endl;
     // 保证 ident 在当前 symbol table 里
     if (can_compute == MODE)
+        // Although Already in SymTb, we should also make sure it's stored
         std::cout << "    store " << val << ", @" << present_tbl()->ST_name << '_' << ident << endl;
     else if (sel){
         initval->IRDump();
@@ -830,6 +850,44 @@ void OptionalExpAST :: IRDump() const {
     exp->IRDump();
 }
 
+// ------------------------------------ Lv 5 Conditional -------------------
+
+void IfStmtAST :: IRDump() const {
+    if (sel == 1){
+        ifelsestmt->IRDump();
+        return;
+    }
+    
+    // pre_compute tech
+    if (can_compute == MODE){
+        if (!val) return; // 预计算值为0，相当于这条语句必不执行，可以直接返回
+
+        ifstmt->IRDump();
+    }
+    else{
+        UPDATE();
+        
+    }
+}
+
+void IfElseStmtAST :: IRDump() const {
+    if (sel == 1){
+        stmt->IRDump();
+        return;
+    }
+
+    // pre_compute tech
+    if (can_compute == MODE){
+        if (!val)
+            ifelsestmtr->IRDump(); // 预计算值为0执行后面的语句
+        else
+            ifelsestmtl->IRDump(); // 否则执行前面的语句
+    }
+    else{
+        UPDATE();
+
+    }
+}
 
 // %0 = load @x
 // std::cout << "    %" << var_num << " = load @" << present_tbl()->ST_name << '_' << lval << endl

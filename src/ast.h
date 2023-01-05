@@ -1,7 +1,6 @@
 #pragma once
 
 #include "symtab.h"
-#include <stack>
 #include <vector>
 /*
     Notes here:
@@ -10,7 +9,10 @@
         3. var_ins[] 的存在，优化了常数加载的指令 (省去所有常数加载的指令，大量减少指令数目)
           // is_01 = 0 -> binary ; 1 -> 0/1 ; 2 -> const
 
-        4. BaseAST 中的 can_compute, val : 编译时预处理技术，提前将可以算的东西算出来, `可以与3.协同工作`
+
+        // 4. 是需要一套系统性的工具，对Parsing 可预测代码段执行进行预处理优化
+
+        *** 4. BaseAST 中的 can_compute, val : 编译时预处理技术，提前将可以算的东西算出来, `可以与3.协同工作`
           详情见 `sysy.y` 中所有有 "// Pre-Compute Tech" tag 的部分
             由于我们在父节点只需要知道子节点是不是可以提前算，并且如果可以的话值是多少，所以 BaseAST 只需要
             多定义 can_compute, val 俩变量
@@ -96,13 +98,56 @@
             （这个是不难的），到时候直接从那里面取就可以了（
         
         15. How to Handle `if-else`
+          - 我们可以将 合法的 `if (exp) stmt [else stmt]` 这个结构 看成一个 `合法的` 括号序列，
+                因为我们定义了，空悬二义性可以通过匹配最近的 if 来解决
+          - 如此一来，我们可以极大地 simplify 我们的 Model:
+            - IfStmt  
+              : IF '(' Exp ')' IfStmt // sel = 0
+                        // [类似 (()())(() 这种有 `未匹配左括号的项的`]
+              | IfElseStmt // sel = 1
+                        // [这个 type 包含了所有完美匹配的括号序列，包括空序列也就是Stmt本身]
+            - IfElseStmt
+              : IF '(' Exp ')' IfElseStmt ELSE IfElseStmt // sel = 0
+                        // [其他非空的完美匹配括号序列，其中这里出现的 IF 表示第一个'('， ELSE
+                        //  表示和它匹配的那个 ')'，然后两个IfElseStmt分别是两个完美序列， 相当于一个递归过程]
+              : Stmt [空序列，Stmt本身] // sel = 1
+            - BlockItem -> Decl | IfStmt
+          - 顺便提一句题外话，Else 对应 ')' 的管辖范围，则是自己右边 以及 
+                                右边第一次出现(从这个')'开始算起的)前缀和 ('(' +1 / ')' -1) < 0  
+                                      那个位置的 ')' 的左边
+
+        16. 我们将 WalkThrough AST 生成 IR 的过程中，关于当前所处作用域的block信息
+          记到了 blk_info 这个 stack 里，具体而言就是一个 pair<>
+            记录，当前是在 which block 的 which sentence 里
+
+        17. If-Else 将会对我们 Pasrsing 时 Pre_compute 造成困难，
+        本质上就是对于 Var 类型的赋值 这个语句的挑战，
+              ，因为有些语句可能在 Run 的时候压根就不会执行，我们无法得到确定的执行 Logic，
+                有些地方就不能提前预赋值
+              ；
+            17.5 - Solution:
+              1. 对于每个 Block 的 SymTbl，我们开一个 Stack 表示这个 Block 中目前执行的语句
+                的可执行状态 state，具体定义见 `symtab.h`
+              2. 然后定义语句不用管，因为定义语句已经把这个变量的作用域局限在
+                这个块了，所以不会造成 outer 的影响，而内部执不执行反正也是统一的
+              3. 对于 `赋值语句`， 我们不能提前确定它的结果 (或者说把它的结果更新到 Parsing SymTbl 里)
+                或者说，要把 Lval 重修丢入 can_compute 的大牢
+                当且仅当：
+                  - 右边的 Exp 我们算不出来
+                  or
+                  - 一路上状态state是 2 (unsure) 
+
+                另外，可达态 == 2 时要忽略这个语句，不管右边的 Exp 算不算的出来
+
+
+            17.9 - 对于const的支持依然成立！
+                - 由于我们会强制对 const 赋值时，强制限定 exp 必须是已知的，有错就会 exit(5)
         
-
-    
-    To-Do :
-      1. 将 Note $4 拓展到 Lv4上 (done)
-      2. 
-
+        18. 尽管我们 Parsing 时有些量可以提前确定记在 SymbleTable里，但是由于之后加入了 If 语句增加了不确定性
+          于是可能在一个不确定 If 对外面块 Var 进行赋值时，我们的 Parser不知道这个变量具体该如何了，于是把它
+            在 SymbleTableItem 的 sel 的 第二位置为 0。
+          这种情况下我们的 IR_generater 则会把这个 Var load 进来，所以我们还是需要之前就算确定了一个赋值语句的结果
+            也要把它存到memory里去 （见 void StmtAST :: IRDump() const ） 
 */
 
 #define MODE 1 // 2 为关掉优化的模式，1为优化模式
@@ -117,6 +162,7 @@ class BaseAST {
   virtual void IRDump() const = 0;
   inline void HandleSJ(int sj) const ;
   int can_compute /* ___can be computed in compiling time___ ? for types below */, val;
+  // After If-Else, can_compute can be extent to 'decided when compiling'
   inline int PreComputeProcedure() const;
   /*
   Already can_compute implemented can_compute TYPE:
@@ -127,6 +173,8 @@ class BaseAST {
     ConstExp
     ConstInitVal
     VarDef
+    - IfStmt
+    - IfElseStmt
 
   When 'can_compute == 0', means:
     1. lack of stack var using (good)
@@ -175,6 +223,29 @@ class BlockAST : public BaseAST {
   void Dump(int sj) const override;
   void IRDump() const override;
 };
+
+// ------------------------ Lv_6 Adding -----------------------------------------------
+
+class IfStmtAST : public BaseAST {
+ public:
+  std::unique_ptr<BaseAST> exp, ifstmt, ifelsestmt;
+  int sel;
+
+  void Dump(int sj) const override;
+  void IRDump() const override;
+};
+
+class IfElseStmtAST : public BaseAST {
+ public:
+  std::unique_ptr<BaseAST> exp, stmt, ifelsestmtl, ifelsestmtr;
+  int sel;
+
+  void Dump(int sj) const override;
+  void IRDump() const override;
+};
+
+
+// ------------------------ Lv_6 Adding -----------------------------------------------
 
 class StmtAST : public BaseAST {
  public:
@@ -297,7 +368,7 @@ class DeclAST : public BaseAST {
 
 class BlockItemAST : public BaseAST {
  public:
-  std::unique_ptr<BaseAST> decl, stmt;
+  std::unique_ptr<BaseAST> decl, ifstmt;
   int sel;
 
   void Dump(int sj) const override;
