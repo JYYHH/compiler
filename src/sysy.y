@@ -37,7 +37,7 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
   std::vector< std::unique_ptr<BaseAST> > *ast_list; // 用来返回vector指针，vector用来存所有子节点
 }
 
-%token INT RETURN CONST
+%token INT RETURN CONST IF ELSE
 %token <str_val> IDENT UOP MULOPT RELOPT EQOPT ANDOPT OROPT
 %token <int_val> INT_CONST
 

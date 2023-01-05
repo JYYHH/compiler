@@ -2,9 +2,15 @@
 #include <memory>
 #include <iostream>
 #include "ast.h"
-// #define var_num present_tbl()->var_num
-// #define is_01 present_tbl()->is_01
-// #define var_ins present_tbl()->var_ins
+
+/*
+    Note for IR Generating:
+        1. Func_Ret, 遇到多个 Return 的时候只会返回第一个，且如果没有 Return 也会返回一个 Return
+            待修理
+        2. 用了一个比较精巧的结构 (int var_num, is_01; int var_ins[300005];)
+            -> 同时存 Koopa 中出现的常量 和 变量
+        
+*/
 
 using namespace std;
 
@@ -78,7 +84,7 @@ inline void BaseAST :: HandleSJ(int sj) const{
 }
 
 int var_num, is_01; // is_01 = 0 -> binary ; 1 -> 0/1 ; 2 -> const
-int var_ins[100005]; // an optimization on saved IR register --- save constant before
+int var_ins[300005]; // an optimization on saved IR register --- save constant before
 // we save space for useless `%xx` items in IR-code, since they're all constant 
 
 
@@ -87,7 +93,7 @@ inline void alr_compute_procedure(int NUMb){
 }
 
 inline int BaseAST :: PreComputeProcedure() const{
-    if (can_compute == 2){ // in this condition, we handle this instr already in the parsing time.
+    if (can_compute == MODE){ // in this condition, we handle this instr already in the parsing time.
         alr_compute_procedure(val);
         return 1;
     }
@@ -527,7 +533,7 @@ void StmtAST :: IRDump() const {
     if (sel == 3){
         Func_Ret ++;
         if (Func_Ret > 1) return;
-        if (can_compute == 2)
+        if (can_compute == MODE)
             std::cout << "    ret " << val << endl;
         else{
             optionalexp->IRDump();
@@ -538,7 +544,7 @@ void StmtAST :: IRDump() const {
         }
     }
     else if (sel == 0){
-        if (can_compute == 2){
+        if (can_compute == MODE){
             // can be ignored, the reason is so fancy... See the comment on the top of 'ast.h'
 
             // string alter_one = lval;
@@ -560,7 +566,7 @@ void StmtAST :: IRDump() const {
         else
             std::cout << "    store %" << var_num - 1 << ", @" << lval_belong->present->ST_name << '_' << lval << endl;
         // And you can consider why there's not other condition?
-        // BBBBBecause, all the tree nodes' 'can_compute == 2' are already determined, after `sysy.y`
+        // BBBBBecause, all the tree nodes' 'can_compute == MODE' are already determined, after `sysy.y`
             // scans the source code.
 
         // But I finally add this function, mainly for testing my code, without pre-compiling tech
@@ -803,7 +809,7 @@ void VarDefAST :: IRDump() const {
     //@x = alloc i32
     std::cout << "    @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << endl;
     // 保证 ident 在当前 symbol table 里
-    if (can_compute == 2)
+    if (can_compute == MODE)
         std::cout << "    store " << val << ", @" << present_tbl()->ST_name << '_' << ident << endl;
     else if (sel){
         initval->IRDump();
