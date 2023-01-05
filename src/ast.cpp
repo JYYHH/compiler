@@ -87,7 +87,7 @@ inline void alr_compute_procedure(int NUMb){
 }
 
 inline int BaseAST :: PreComputeProcedure() const{
-    if (can_compute){ // in this condition, we handle this instr already in the parsing time.
+    if (can_compute == 2){ // in this condition, we handle this instr already in the parsing time.
         alr_compute_procedure(val);
         return 1;
     }
@@ -527,7 +527,7 @@ void StmtAST :: IRDump() const {
     if (sel == 3){
         Func_Ret ++;
         if (Func_Ret > 1) return;
-        if (can_compute)
+        if (can_compute == 2)
             std::cout << "    ret " << val << endl;
         else{
             optionalexp->IRDump();
@@ -538,7 +538,7 @@ void StmtAST :: IRDump() const {
         }
     }
     else if (sel == 0){
-        if (can_compute){
+        if (can_compute == 2){
             // can be ignored, the reason is so fancy... See the comment on the top of 'ast.h'
 
             // string alter_one = lval;
@@ -560,7 +560,7 @@ void StmtAST :: IRDump() const {
         else
             std::cout << "    store %" << var_num - 1 << ", @" << lval_belong->present->ST_name << '_' << lval << endl;
         // And you can consider why there's not other condition?
-        // BBBBBecause, all the tree nodes' 'can_compute' are already determined, after `sysy.y`
+        // BBBBBecause, all the tree nodes' 'can_compute == 2' are already determined, after `sysy.y`
             // scans the source code.
 
         // But I finally add this function, mainly for testing my code, without pre-compiling tech
@@ -803,7 +803,7 @@ void VarDefAST :: IRDump() const {
     //@x = alloc i32
     std::cout << "    @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << endl;
     // 保证 ident 在当前 symbol table 里
-    if (can_compute)
+    if (can_compute == 2)
         std::cout << "    store " << val << ", @" << present_tbl()->ST_name << '_' << ident << endl;
     else if (sel){
         initval->IRDump();
