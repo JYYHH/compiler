@@ -5,46 +5,7 @@
 
 using namespace std;
 
-string sj_map[40] = {
-  "",
-  "  ",
-  "    ",
-  "      ",
-  "        ",
-  "          ",
-  "            ",
-  "              ",
-  "                ",
-  "                  ",
-  "                    ",
-  "                      ",
-  "                        ",
-  "                          ",
-  "                            ",
-  "                              ",
-  "                                ",
-  "                                  ",
-  "                                    ",
-  "                                      ",
-  "                                        ",
-  "                                          ",
-  "                                            ",
-  "                                              ",
-  "                                                ",
-  "                                                  ",
-  "                                                    ",
-  "                                                      ",
-  "                                                        ",
-  "                                                          ",
-  "                                                            ",
-  "                                                              ",
-  "                                                                ",
-  "                                                                  ",
-  "                                                                    ",
-  "                                                                      ",
-  "                                                                        ",
-  "                                                                          " 
-};
+string sj_map[305];
 
 
 inline void BaseAST :: HandleSJ(int sj) const{
@@ -54,6 +15,9 @@ inline void BaseAST :: HandleSJ(int sj) const{
 // ------------------ Dump Begin ---------------------------------------------
 
 void CompUnitAST :: Dump(int sj) const{
+    sj_map[0] = "";
+    for(int i=1;i<=300;i++) sj_map[i] = sj_map[i-1] + "  ";
+
     HandleSJ(sj);
     std::cout << "CompUnitAST {" << endl;
     func_def->Dump(sj+1);

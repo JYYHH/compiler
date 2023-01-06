@@ -39,6 +39,7 @@ stack< Pr > blk_info;
 string now_btype;
 int BLKID, ID_instr, Func_Ret;
 int If_num = 0;
+int OR_num = 0, AND_num = 0;
 
 inline void UPDATE(){
     Pr &u = TOP;
@@ -223,13 +224,31 @@ void LOrExpAST :: IRDump() const {
     if (sel == 0)
         landexp->IRDump();
     else{
+        int ORNUM = ++OR_num;
+        // @x = alloc i32
+        std::cout << "    @" << "LOR" << '_' << ORNUM << " = alloc i32" << endl;
+        // store 1, @x
+        std::cout << "    store 1, @LOR_" << ORNUM << endl;
+
         lorexp->IRDump();
         bin201();
-        int pre = var_num - 1;
+
+        if (is_01 >> 1)
+            std::cout << "    br " << var_ins[var_num - 1] << ", %" << "LOREND" << '_' << ORNUM << ", %" << "LORTHEN" << '_' << ORNUM << endl;
+        else
+            std::cout << "    br %" << var_num - 1 << ", %" << "LOREND" << '_' << ORNUM << ", %" << "LORTHEN" << '_' << ORNUM << endl;
+        
+        std::cout << " %" << "LORTHEN" << '_' << ORNUM << ':' << endl;
         landexp->IRDump();
         bin201();
-        out_binary_IR(pre, var_num - 1, "or");
-        is_01 = 1;
+        // store %<new>, @x
+        std::cout << "    store %" << var_num - 1 << ", @LOR_" << ORNUM << endl;
+        std::cout << "    jump %" << "LOREND" << '_' << ORNUM << endl;
+
+        std::cout << " %" << "LOREND" << '_' << ORNUM << ':' << endl;
+        // %<new> = load @x
+        std::cout << "    %" << var_num << " = load @LOR_" << ORNUM << endl;
+        var_num ++, is_01 = 1;
     }
 }
 void LAndExpAST :: IRDump() const {
@@ -238,13 +257,31 @@ void LAndExpAST :: IRDump() const {
     if (sel == 0)
         eqexp->IRDump();
     else{
+        int ANDNUM = ++AND_num;
+        // @x = alloc i32
+        std::cout << "    @" << "LAND" << '_' << ANDNUM << " = alloc i32" << endl;
+        // store 1, @x
+        std::cout << "    store 0, @LAND_" << ANDNUM << endl;
+
         landexp->IRDump();
         bin201();
-        int pre = var_num - 1;
+
+        if (is_01 >> 1)
+            std::cout << "    br " << var_ins[var_num - 1] << ", %" << "LANDTHEN" << '_' << ANDNUM << ", %" << "LANDEND" << '_' << ANDNUM << endl;
+        else
+            std::cout << "    br %" << var_num - 1 << ", %" << "LANDTHEN" << '_' << ANDNUM << ", %" << "LANDEND" << '_' << ANDNUM << endl;
+        
+        std::cout << " %" << "LANDTHEN" << '_' << ANDNUM << ':' << endl;
         eqexp->IRDump();
         bin201();
-        out_binary_IR(pre, var_num - 1, "and");
-        is_01 = 1;
+        // store %<new>, @x
+        std::cout << "    store %" << var_num - 1 << ", @LAND_" << ANDNUM << endl;
+        std::cout << "    jump %" << "LANDEND" << '_' << ANDNUM << endl;
+
+        std::cout << " %" << "LANDEND" << '_' << ANDNUM << ':' << endl;
+        // %<new> = load @x
+        std::cout << "    %" << var_num << " = load @LAND_" << ANDNUM << endl;
+        var_num ++, is_01 = 1;
     }
 }
 void EqExpAST :: IRDump() const {

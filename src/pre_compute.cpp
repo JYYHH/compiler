@@ -174,10 +174,12 @@ void LOrExpAST :: PreCompute(){
         can_compute = lorexp->can_compute && landexp->can_compute;
         if (can_compute)
             val = lorexp->val || landexp->val;
-        else if (lorexp->can_compute && lorexp->val)
-            can_compute = val = 1;
-        else if (landexp->can_compute && landexp->val)
-            can_compute = val = 1;
+        // Parsing 时暂时不能短路求值
+
+        // else if (lorexp->can_compute && lorexp->val)
+        //     can_compute = val = 1;
+        // else if (landexp->can_compute && landexp->val)
+        //     can_compute = val = 1;
     }
 }
 
@@ -193,10 +195,12 @@ void LAndExpAST :: PreCompute(){
         can_compute = landexp->can_compute && eqexp->can_compute;
         if (can_compute)
             val = landexp->val && eqexp->val;
-        else if (landexp->can_compute && !landexp->val)
-            can_compute = 1, val = 0;
-        else if (eqexp->can_compute && !eqexp->val)
-            can_compute = 1, val = 0;
+        // Parsing 时暂时不能短路求值
+        
+        // else if (landexp->can_compute && !landexp->val)
+        //     can_compute = 1, val = 0;
+        // else if (eqexp->can_compute && !eqexp->val)
+        //     can_compute = 1, val = 0;
     }
 }
 
