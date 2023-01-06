@@ -1,3 +1,10 @@
+/*
+  - 从我们 Generate 的 IR 到 Load 成 Raw_Program 的 IR，也是被加了优化
+  
+  - 对 If-Else 指令做内存占用减少的优化？
+
+*/
+
 #include <string>
 #include <memory>
 #include <cassert>
@@ -344,6 +351,14 @@ void Visit(const koopa_raw_value_t &value, const int mode) {
       if (!mode)
         Visit(kind.data.store, mode);
       break;
+    case KOOPA_RVT_BRANCH:
+      if (!mode)
+        Visit(kind.data.branch, mode);
+      break;
+    case KOOPA_RVT_JUMP:
+      if (!mode)
+        Visit(kind.data.jump, mode);
+      break;
     default:
       break;
       // 其他类型暂时遇不到
@@ -399,6 +414,19 @@ void Visit(const koopa_raw_load_t &LoadOP, const int mode){
 void Visit(const koopa_raw_store_t &StoreOP, const int mode){
   Instr2Register(StoreOP.value, "t2");
   Register2Instr(StoreOP.dest, "t2");
+}
+
+void Visit(const koopa_raw_branch_t &Branch, const int mode){
+  // Branch.cond;
+  // cout << Branch.true_bb->name << endl;
+  // ...
+  Instr2Register(Branch.cond, "t2");
+  cout << risc_bnez("t2", Branch.true_bb->name + 1);
+  cout << risc_j(Branch.false_bb->name + 1);
+}
+
+void Visit(const koopa_raw_jump_t &Jump, const int mode){
+  cout << risc_j(Jump.target->name + 1);
 }
 
 

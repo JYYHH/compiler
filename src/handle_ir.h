@@ -36,6 +36,9 @@ void Visit(const koopa_raw_integer_t &INT, const int mode);
 void Visit(const koopa_raw_binary_t &BinOP, const int mode);
 void Visit(const koopa_raw_load_t &LoadOP, const int mode);
 void Visit(const koopa_raw_store_t &StoreOP, const int mode);
+void Visit(const koopa_raw_branch_t &Branch, const int mode);
+void Visit(const koopa_raw_jump_t &Jump, const int mode);
+
 
 
 int handle_str_ir(const char *str);
