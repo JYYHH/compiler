@@ -27,14 +27,13 @@ class SymbolTableItem {
 
 class SymbolTable {
  public:
-    std::unordered_map < std::string, SymbolTableItem* > ST;
-    std::stack <int> reach_st;// 用来实现可达管理
+    std::unordered_map < std::string, SymbolTableItem* > ST; // 管理 Lval
+    std::stack <int> reach_st; // 用来实现可达管理
                             // 1 -> 必可达 / 0 -> 必不可达 / 2 -> 我不好说...
                             // 在初始进入一个 Block，或者有 If 语句时，处理这个Stack
     std::string ST_name;
     SymbolTable *father;
-    SymbolTable *present;
-    int present_state;
+    SymbolTable *present; // 返回 GetItemByName 对应的 SymbolTable*
 
     void Insert(std::string &name, SymbolTableItem &STitem);
     SymbolTableItem* GetItemByName(std::string &name);

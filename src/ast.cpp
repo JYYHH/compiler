@@ -9,11 +9,26 @@
             待修理
         2. 用了一个比较精巧的结构 (int var_num, is_01; int var_ins[300005];)
             -> 同时存 Koopa 中出现的常量 和 变量
-        
+    
+    Note for DS using:
+        1. BaseAST 中的 :
+            static std::stack< SymbolTable* > *glbstst; -> 维护 parsing 以及 IR_generating 中需要的
+              符号表栈
+                - 对应函数是：
+                    1. present_tbl()
+                    2. push_into_tbl_stk()
+                    3. pop_tbl_stk()
+            static SymbolTable *glbsymbtl; -> 全局符号表?
+        3. stack< Pr > blk_info;
+            IR_generating 时块信息的管理，主要用来管理当前 Block 和 Instr在这个Block中的ID
+        4.  int var_num, is_01;
+            int var_ins[300005];
+           这些是用来维护，IR_generating过程中，所有 `%number` 项目的信息
+        6. 
+          
 */
 
 using namespace std;
-#define Pr pair<int,int> 
 
 // Block Info & Func Ret
 stack< Pr > blk_info;
@@ -23,9 +38,10 @@ stack< Pr > blk_info;
 
 string now_btype;
 int BLKID, ID_instr, Func_Ret;
+int If_num = 0;
 
 inline void UPDATE(){
-    P &u = TOP;
+    Pr &u = TOP;
     BLKID = u.first;
     ID_instr = u.second;
 }
@@ -48,53 +64,7 @@ void pop_tbl_stk(){
 }
 
 // Page Table Part ----------------------------------------------------------
-
-
-string sj_map[40] = {
-  "",
-  "  ",
-  "    ",
-  "      ",
-  "        ",
-  "          ",
-  "            ",
-  "              ",
-  "                ",
-  "                  ",
-  "                    ",
-  "                      ",
-  "                        ",
-  "                          ",
-  "                            ",
-  "                              ",
-  "                                ",
-  "                                  ",
-  "                                    ",
-  "                                      ",
-  "                                        ",
-  "                                          ",
-  "                                            ",
-  "                                              ",
-  "                                                ",
-  "                                                  ",
-  "                                                    ",
-  "                                                      ",
-  "                                                        ",
-  "                                                          ",
-  "                                                            ",
-  "                                                              ",
-  "                                                                ",
-  "                                                                  ",
-  "                                                                    ",
-  "                                                                      ",
-  "                                                                        ",
-  "                                                                          " 
-};
-
 // Some Useful function
-inline void BaseAST :: HandleSJ(int sj) const{
-    std::cout << sj_map[sj];
-}
 
 int var_num, is_01; // is_01 = 0 -> binary ; 1 -> 0/1 ; 2 -> const
 int var_ins[300005]; // an optimization on saved IR register --- save constant before
@@ -113,389 +83,6 @@ inline int BaseAST :: PreComputeProcedure() const{
     return 0;
 }
 
-// ------------------ Dump Begin ---------------------------------------------
-
-void CompUnitAST :: Dump(int sj) const{
-    HandleSJ(sj);
-    std::cout << "CompUnitAST {" << endl;
-    func_def->Dump(sj+1);
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-void FuncDefAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "FuncDefAST {" << endl;
-    func_type->Dump(sj+1);
-    std::cout << ',' << endl;
-    HandleSJ(sj+1);
-    std::cout << "FuncName = " << ident << ',' << endl;
-    block->Dump(sj+1);
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-void FuncTypeAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "FuncTypeAST { ";
-    std::cout << type;
-    std::cout << " }";
-}
-void BlockAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "BlockAST {" << endl;  
-    std::vector< std::unique_ptr<BaseAST> > &now_vec = *blockitem; 
-    HandleSJ(sj+1);
-    std::cout << "ChildNum = " << child_num << endl;
-    for (int i=0; i<child_num; i++){
-        now_vec[i]->Dump(sj + 1);
-        std::cout << "********** End of Child " << i <<endl;
-    }
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-void StmtAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "StmtAST {" <<endl;
-    if (sel == 3){
-        HandleSJ(sj+1);
-        std::cout << "return" << endl;
-        optionalexp->Dump(sj + 1);
-    }
-    else if (sel == 2){
-        block->Dump(sj + 1);
-    }
-    else if (sel == 1){
-        optionalexp->Dump(sj + 1);
-    }
-    else{
-        HandleSJ(sj+1);
-        std::cout << lval << endl;
-        HandleSJ(sj+1);
-        std::cout << '=' << endl;
-        exp->Dump(sj + 1);        
-    }  
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-void ExpAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "ExpAST {" <<endl; 
-    lorexp->Dump(sj + 1);
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-void LOrExpAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "LOrExpAST {" <<endl; 
-    if (sel == 0){
-        landexp->Dump(sj + 1);
-    }
-    else{
-        lorexp->Dump(sj + 1);
-        std::cout << endl;
-        HandleSJ(sj + 1);
-        std::cout << "||" << endl;
-        landexp->Dump(sj + 1);
-    }
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-void LAndExpAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "LAndExpAST {" <<endl; 
-    if (sel == 0){
-        eqexp->Dump(sj + 1);
-    }
-    else{
-        landexp->Dump(sj + 1);
-        std::cout << endl;
-        HandleSJ(sj + 1);
-        std::cout << "&&" << endl;
-        eqexp->Dump(sj + 1);
-    }
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-void EqExpAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "EqExpAST {" <<endl; 
-    if (sel == 0){
-        relexp->Dump(sj + 1);
-    }
-    else{
-        eqexp->Dump(sj + 1);
-        std::cout << endl;
-        HandleSJ(sj + 1);
-        std::cout << rel << endl;
-        relexp->Dump(sj + 1);
-    }
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-void RelExpAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "RelExpAST {" <<endl; 
-    if (sel == 0){
-        addexp->Dump(sj + 1);
-    }
-    else{
-        relexp->Dump(sj + 1);
-        std::cout << endl;
-        HandleSJ(sj + 1);
-        std::cout << rel << endl;
-        addexp->Dump(sj + 1);
-    }
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-void AddExpAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "AddExpAST {" <<endl; 
-    if (sel == 0){
-        mulexp->Dump(sj + 1);
-    }
-    else{
-        addexp->Dump(sj + 1);
-        std::cout << endl;
-        HandleSJ(sj + 1);
-        std::cout << opt << endl;
-        mulexp->Dump(sj + 1);
-    }
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-void MulExpAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "MulExpAST {" <<endl; 
-    if (sel == 0){
-        unaryexp->Dump(sj + 1);
-    }
-    else{
-        mulexp->Dump(sj + 1);
-        std::cout << endl;
-        HandleSJ(sj + 1);
-        std::cout << opt << endl;
-        unaryexp->Dump(sj + 1);
-    }
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-void UnaryExpAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "UnaryExpAST {" <<endl; 
-    if (sel == 0){
-        pexp->Dump(sj + 1);
-    }
-    else{
-        HandleSJ(sj + 1);
-        std::cout << opt;
-        std::cout << ',' << endl;
-        unaryexp->Dump(sj + 1);
-    }
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-// void UnaryOpAST :: Dump(int sj) const {
-//     HandleSJ(sj);
-//     std::cout << opt;
-// }
-
-void PrimaryExpAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "PrimaryExpAST {" <<endl; 
-    if (sel == 0){
-        exp->Dump(sj + 1);
-    }
-    else if (sel == 1){
-        HandleSJ(sj + 1);
-        std::cout << "Number = " << number;
-    }
-    else{
-        HandleSJ(sj + 1);
-        std::cout << "VarName = " << lval;
-    }
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-void DeclAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "DeclAST {" <<endl; 
-
-    if (sel == 0)
-        constdecl->Dump(sj + 1);
-    else
-        vardecl->Dump(sj + 1);
-
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-void BlockItemAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "BlockItemAST {" <<endl; 
-
-    if (sel == 0)
-        decl->Dump(sj + 1);
-    else
-        ifstmt->Dump(sj + 1);
-
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-} 
-
-void InitValAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "InitValAST {" <<endl; 
-
-    exp->Dump(sj + 1);
-
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-} 
-
-void ConstExpAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "ConstExpAST {" <<endl; 
-
-    exp->Dump(sj + 1);
-
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-} 
-
-void ConstInitValAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "ConstInitValAST {" <<endl; 
-
-    constexp->Dump(sj + 1);
-
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-} 
-
-void ConstDefAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "ConstDefAST {" <<endl; 
-    
-    HandleSJ(sj + 1);
-    std::cout << "(IDENT)" << ident << '=' << endl;
-    constinitval->Dump(sj + 1);
-
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-} 
-
-void ConstDeclAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "ConstDeclAST {" << endl;  
-    HandleSJ(sj + 1);
-    std::cout << "const" << endl;
-    HandleSJ(sj + 1);
-    std::cout << btype << endl;
-    std::cout << endl;
-
-    std::vector< std::unique_ptr<BaseAST> > &now_vec = *constdef; 
-    HandleSJ(sj+1);
-    std::cout << "ChildNum = " << child_num << endl;
-    for (int i=0; i<child_num; i++){
-        now_vec[i]->Dump(sj + 1);
-        std::cout << "********** End of Child " << i << endl;
-    }
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-void VarDefAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "VarDefAST {" <<endl; 
-    
-    if (sel == 1){
-        HandleSJ(sj + 1);
-        std::cout << "(IDENT)" << ident << '=' << endl;
-        initval->Dump(sj + 1);
-    }
-    else{
-        HandleSJ(sj + 1);
-        std::cout << "(IDENT)" << ident;
-    }
-
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-} 
-
-void VarDeclAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "VarDeclAST {" << endl;  
-    HandleSJ(sj + 1);
-    std::cout << btype << endl;
-    std::cout << endl;
-
-    std::vector< std::unique_ptr<BaseAST> > &now_vec = *vardef; 
-    HandleSJ(sj+1);
-    std::cout << "ChildNum = " << child_num << endl;
-    for (int i=0; i<child_num; i++){
-        now_vec[i]->Dump(sj + 1);
-        std::cout << "********** End of Child " << i <<endl;
-    }
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-void OptionalExpAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "OptionalExpAST {" <<endl; 
-
-    if (exp != NULL)
-        exp->Dump(sj + 1);
-
-    std::cout << endl;
-    HandleSJ(sj);
-    std::cout << "}";
-}
-
-void IfStmtAST :: Dump(int sj) const{
-
-}
-
-void IfElseStmtAST :: Dump(int sj) const {
-
-}
-
-
-// ------------------ Dump End ---------------------------------------------
-
-
 // ---------------------Begin the Part of Generting the IR (koopa)---------------------------------
 
 void CompUnitAST :: IRDump() const{
@@ -512,8 +99,7 @@ void FuncDefAST :: IRDump() const {
     std::cout << " %" << "entry:" << endl;
     Func_Ret = 0;
     block->IRDump();
-    if (Func_Ret == 0)
-        std::cout << "   ret" << endl;
+    std::cout << "    ret 0" << endl;
     std::cout << "}" << endl;
 }
 void FuncTypeAST :: IRDump() const {
@@ -522,6 +108,7 @@ void FuncTypeAST :: IRDump() const {
 }
 void BlockAST :: IRDump() const {
     push_into_tbl_stk(symbtl, 1);
+    present_tbl()->reach_st.push(1);
 
     // list the basic block here further?
     std::vector< std::unique_ptr<BaseAST> > &now_vec = *blockitem; 
@@ -536,6 +123,7 @@ void BlockAST :: IRDump() const {
         POP;
     }
 
+    present_tbl()->reach_st.pop();
     pop_tbl_stk();
 }
 
@@ -546,14 +134,15 @@ void BlockItemAST :: IRDump() const {
     if (sel == 0)
         decl->IRDump();
     else 
-        ifstmt->IRDump();
+        glbif->IRDump();
 }
 
 void StmtAST :: IRDump() const {
     // var_num = 0;
     if (sel == 3){
         Func_Ret ++;
-        if (Func_Ret > 1) return;
+        // if (Func_Ret > 1) return;
+
         if (can_compute == MODE)
             std::cout << "    ret " << val << endl;
         else{
@@ -563,12 +152,13 @@ void StmtAST :: IRDump() const {
             else
                 std::cout << "    ret %" << var_num - 1 << endl;
         }
+
+        std::cout << " %" << "after_ret_" << Func_Ret << ':' << endl;
     }
     else if (sel == 0){
         if (can_compute == MODE){
             string alter_one = lval;
-            present_tbl()->GetItemByName(alter_one);
-            std::cout << "    store " << val << ", @" << present_tbl()->present->ST_name << '_' << lval << endl;
+            std::cout << "    store " << val << ", @" << lval_belong->ST_name << '_' << lval << endl;
             return;
         }
 
@@ -576,14 +166,13 @@ void StmtAST :: IRDump() const {
         // store %1, @x
 
         string alter_one = lval;
-        lval_belong->GetItemByName(alter_one);
 
         // cout << "STMT Belong to Block: " << lval_belong->ST_name << endl;
 
         if(is_01 >> 1)
-            std::cout << "    store " << var_ins[var_num - 1] << ", @" << lval_belong->present->ST_name << '_' << lval << endl;
+            std::cout << "    store " << var_ins[var_num - 1] << ", @" << lval_belong->ST_name << '_' << lval << endl;
         else
-            std::cout << "    store %" << var_num - 1 << ", @" << lval_belong->present->ST_name << '_' << lval << endl;
+            std::cout << "    store %" << var_num - 1 << ", @" << lval_belong->ST_name << '_' << lval << endl;
         // And you can consider why there's not other condition?
         // BBBBBecause, all the tree nodes' 'can_compute == MODE' are already determined, after `sysy.y`
             // scans the source code.
@@ -767,7 +356,7 @@ void PrimaryExpAST :: IRDump() const {
             alr_compute_procedure(ret->VarVal());
             return;
         }
-        std::cout << "    %" << var_num << " = load @" << lval_belong->present->ST_name << '_' << lval << endl;
+        std::cout << "    %" << var_num << " = load @" << lval_belong->ST_name << '_' << lval << endl;
         var_num ++, is_01 = 0;
     }
     else 
@@ -852,21 +441,81 @@ void OptionalExpAST :: IRDump() const {
 
 // ------------------------------------ Lv 5 Conditional -------------------
 
+void GLBIfAST :: IRDump() const {
+    if (sel == 0)
+        ifstmt->IRDump();
+    else
+        ifelsestmt->IRDump();
+}
+
 void IfStmtAST :: IRDump() const {
     if (sel == 1){
-        ifelsestmt->IRDump();
-        return;
-    }
-    
-    // pre_compute tech
-    if (can_compute == MODE){
-        if (!val) return; // 预计算值为0，相当于这条语句必不执行，可以直接返回
+        // IF '(' Exp ') IfElseStmt ELSE IfStmt
 
-        ifstmt->IRDump();
+        // pre_compute tech
+        if (can_compute == MODE){
+            if (!val)
+                ifstmt->IRDump(); // 预计算值为0执行后面的语句
+            else
+                ifelsestmt->IRDump(); // 否则执行前面的语句
+        }
+        else{
+            If_num ++;
+            int IFNUM = If_num;
+            
+            // First Br
+            exp->IRDump();
+            UPDATE();
+            if (is_01>>1)
+                std::cout << "    br " << var_ins[var_num - 1] << ", %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "then" << ", %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "else"  << endl; 
+            else
+                std::cout << "    br %" << var_num - 1 << ", %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "then" << ", %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "else"  << endl; 
+
+            // Then Then
+            std::cout << " %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "then:" << endl;
+            ifelsestmt->IRDump();
+            UPDATE();
+            std::cout << "    jump %" <<  "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "end" << endl; 
+
+            // Then Else
+            std::cout << " %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "else:" << endl;
+            ifstmt->IRDump();
+            UPDATE();
+            std::cout << "    jump %" <<  "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "end" << endl; 
+
+            // Finally End
+            std::cout << " %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "end:" << endl;
+        }    
     }
     else{
-        UPDATE();
+        // IF '(' Exp ')' GLBIf
         
+        // pre_compute tech
+        if (can_compute == MODE){
+            if (!val) return; // 预计算值为0，相当于这条语句必不执行，可以直接返回
+            glbif->IRDump();
+        }
+        else{
+            If_num ++;
+            int IFNUM = If_num;
+
+            // First Br
+            exp->IRDump();
+            UPDATE();
+            if (is_01>>1)
+                std::cout << "    br " << var_ins[var_num - 1] << ", %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "then" << ", %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "end"  << endl; 
+            else
+                std::cout << "    br %" << var_num - 1 << ", %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "then" << ", %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "end"  << endl; 
+
+            // Then Then
+            std::cout << " %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "then:" << endl;
+            glbif->IRDump();
+            UPDATE();
+            std::cout << "    jump %" <<  "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "end" << endl; 
+
+            // Finally End
+            std::cout << " %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "end:" << endl;
+        }
     }
 }
 
@@ -883,9 +532,33 @@ void IfElseStmtAST :: IRDump() const {
         else
             ifelsestmtl->IRDump(); // 否则执行前面的语句
     }
-    else{
-        UPDATE();
 
+    else{
+        If_num ++;
+        int IFNUM = If_num;
+
+        // First Br
+        exp->IRDump();
+        UPDATE();
+        if (is_01>>1)
+            std::cout << "    br " << var_ins[var_num - 1] << ", %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "then" << ", %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "else"  << endl; 
+        else
+            std::cout << "    br %" << var_num - 1 << ", %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "then" << ", %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "else"  << endl; 
+
+        // Then Then
+        std::cout << " %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "then:" << endl;
+        ifelsestmtl->IRDump();
+        UPDATE();
+        std::cout << "    jump %" <<  "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "end" << endl; 
+
+        // Then Else
+        std::cout << " %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "else:" << endl;
+        ifelsestmtr->IRDump();
+        UPDATE();
+        std::cout << "    jump %" <<  "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_' << "end" << endl; 
+
+        // Finally End
+        std::cout << " %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_'  << "end:" << endl;
     }
 }
 

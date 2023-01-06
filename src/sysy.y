@@ -17,9 +17,7 @@ void yyerror(std::unique_ptr<BaseAST> &ast, const char *s);
 
 using namespace std;
 
-int total_blk_num = 0;
-stack< BlockAST* > blk_st; // 用来实现块管理
-std::stack< SymbolTable* > * BaseAST::glbstst = new std::stack< SymbolTable* >;
+stack< SymbolTable* > * BaseAST::glbstst = new stack< SymbolTable* >;
 SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
 
 %}
@@ -36,7 +34,7 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
   BaseAST *ast_val; // 用来返回每个非终结符对应的子语法树
   std::vector< std::unique_ptr<BaseAST> > *ast_list; // 用来返回vector指针，vector用来存所有子节点
 }
-
+%define parse.error verbose
 %token INT RETURN CONST IF ELSE
 %token <str_val> IDENT UOP MULOPT RELOPT EQOPT ANDOPT OROPT
 %token <int_val> INT_CONST
@@ -52,7 +50,7 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
 // Lv_5 块儿定义
 %type <ast_val> OptionalExp
 // Lv_6 If-else
-%type <ast_val> IfStmt IfElseStmt
+%type <ast_val> IfStmt IfElseStmt GLBIf
 
 %type <str_val> LVal BType
 %type <int_val> Number
@@ -61,15 +59,9 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
 
 
 CompUnit
-  : { 
-    BaseAST::glbsymbtl->ST_name = "GLOBAL_Table";
-    push_into_tbl_stk( BaseAST::glbsymbtl, 0); // 全局变量表进入
-  }
-   FuncDef {
+  : FuncDef {
     auto comp_unit = make_unique<CompUnitAST>();
-    comp_unit->func_def = unique_ptr<BaseAST>($2);
-
-    pop_tbl_stk(); // 全局变量表退出
+    comp_unit->func_def = unique_ptr<BaseAST>($1);
     ast = move(comp_unit);
   }
   ;
@@ -95,78 +87,74 @@ FuncType
   ;
 
 Block
-  : {
-    total_blk_num ++;
-    auto BLKast = new BlockAST();
-    BLKast->block_id = total_blk_num;
-    BLKast->symbtl = new SymbolTable();
-    BLKast->symbtl->ST_name = "block_" + std::to_string(total_blk_num);
-    push_into_tbl_stk(BLKast->symbtl, 1); // 这个 Block 的符号表进入
-    BLKast->symbtl->reach_st.push(1); // 
-    blk_st.push(BLKast);
+  : '{' Block_inter '}' {
+    auto ast = new BlockAST();
+    ast->blockitem = ($2);
+    ast->child_num = (int)(*(ast->blockitem)).size();
+    $$ = ast;
   }
-   '{' Block_inter '}' {
-    auto BLKast = blk_st.top();
-    BLKast->blockitem = ($3);
-    BLKast->child_num = (int)(*(BLKast->blockitem)).size();
-    blk_st.pop();
-    BLKast->symbtl->reach_st.pop();
-    pop_tbl_stk(); // 这个 Block 的符号表退出
+  ;
 
-    $$ = BLKast;
+// subroutine:
+//   %empty {
+//     exp_state.push(NOW_exp);
+//     present_tbl()->Push(!!NOW_exp.first, !!NOW_exp.second);
+//   }
+// ;
+
+// subroutine2:
+//   %empty {
+//     NOW_exp = exp_state.top();
+//     exp_state.pop();
+//     present_tbl()->Pop();
+
+//     exp_state.push(Pr(NOW_exp.first, !NOW_exp.second));
+//     present_tbl()->Push(NOW_exp.first, !NOW_exp.second);
+//   }
+// ;
+
+GLBIf 
+  : IfStmt {
+    auto ast = new GLBIfAST();
+    ast->sel = 0;
+    ast->ifstmt = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
+  | IfElseStmt {
+    auto ast = new GLBIfAST();
+    ast->sel = 1;
+    ast->ifelsestmt = unique_ptr<BaseAST>($1);
+    $$ = ast;
   }
   ;
 
 IfStmt
-  : IF '(' Exp {
-    auto temp = unique_ptr<BaseAST>($3);
-    present_tbl()->Push(!!temp->can_compute, !!temp->val);
-  } ')' IfStmt {
-    present_tbl()->Pop();
-
+  : IF '(' Exp ')' GLBIf {
     auto ast = new IfStmtAST();
     ast->sel = 0;
     ast->exp = unique_ptr<BaseAST>($3);
-    ast->ifstmt = unique_ptr<BaseAST>($6);
-
-    // Pre-Compute
-    ast->can_compute = ast->exp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->exp->val;
-
+    ast->glbif = unique_ptr<BaseAST>($5);
     $$ = ast;
   }
-  | IfElseStmt {
+  | IF '(' Exp ')' IfElseStmt ELSE IfStmt {
     auto ast = new IfStmtAST();
     ast->sel = 1;
-    ast->ifelsestmt = unique_ptr<BaseAST>($1);
-    ast->can_compute = 1;
-
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->ifelsestmt = unique_ptr<BaseAST>($5);
+    ast->ifstmt = unique_ptr<BaseAST>($7);
     $$ = ast;
   }
   ;
 
+
+
 IfElseStmt
-  : IF '(' Exp {
-    auto temp = unique_ptr<BaseAST>($3);
-    present_tbl()->Push(!!temp->can_compute, !!temp->val);
-  } ')' IfElseStmt {
-    present_tbl()->Pop();
-    auto temp = unique_ptr<BaseAST>($3);
-    present_tbl()->Push(!!temp->can_compute, !temp->val);
-  } ELSE IfElseStmt {
-    present_tbl()->Pop();
+  : IF '(' Exp ')' IfElseStmt ELSE IfElseStmt {
     auto ast = new IfElseStmtAST();
     ast->sel = 0;
     ast->exp = unique_ptr<BaseAST>($3);
-    ast->ifelsestmtl = unique_ptr<BaseAST>($6);
-    ast->ifelsestmtr = unique_ptr<BaseAST>($9);
-
-    // Pre-Compute
-    ast->can_compute = ast->exp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->exp->val;
-
+    ast->ifelsestmtl = unique_ptr<BaseAST>($5);
+    ast->ifelsestmtr = unique_ptr<BaseAST>($7);
     $$ = ast;
   }
   | Stmt {
@@ -174,27 +162,16 @@ IfElseStmt
     ast->sel = 1;
     ast->stmt = unique_ptr<BaseAST>($1);
     ast->can_compute = 1;
-
     $$ = ast;
   }
   ;
 
 
 Stmt
-  : 
-  // {
-  //   // Check Something
-  //   std::cout << "Down here?" << endl;
-  // }
-  RETURN OptionalExp ';' {
+  : RETURN OptionalExp ';' {
     auto ast = new StmtAST();
     ast->optionalexp = unique_ptr<BaseAST>($2);
     ast->sel = 3;
-
-    ast->can_compute = ast->optionalexp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->optionalexp->val;
-
     $$ = ast;
   }
   | LVal '=' Exp ';' { // 赋值语句是最麻烦的
@@ -202,57 +179,18 @@ Stmt
     ast->exp = unique_ptr<BaseAST>($3);
     ast->lval = *unique_ptr<string>($1);
     ast->sel = 0;
-
-    auto pres_symbtl = present_tbl();
-    // Check whether something wrong?
-    auto ret = pres_symbtl->GetItemByName(ast->lval);
-    ast->lval_belong = pres_symbtl->present;
-
-    if (ret == NULL)
-      exit(4);
-    if (!(ret->VarType() & 1))
-      exit(6);
-
-    // Changing the Mode of a Var, into unknown state
-    // See comments in the top of `ast.h` for details
-    if (ast->exp->can_compute == 0 || pres_symbtl->present_state == 2){
-      ast->can_compute = 0;
-      ret->BecomeUnknown();
-      // waiting computing it on the stack
-    }
-    // Conditions below has 'exp' 's attribute `can_compute = 1`
-    else{
-      if (pres_symbtl->present_state){
-        ast->can_compute = 1;
-        ast->val = ast->exp->val;
-        ret->SetVal(ast->val);
-      }
-      else{
-        // We just do nothing,
-        // First reason is that this AST element can't be accessed when generating IR,
-          // So it doesn't make sense whether you do anything here.
-        // Second is that, no consequence can be pushed onto the Symbol Table
-      }
-    }
     $$ = ast;
   }
   | OptionalExp ';' {
     auto ast = new StmtAST();
     ast->optionalexp = unique_ptr<BaseAST>($1);
     ast->sel = 1;
-
-    ast->can_compute = ast->optionalexp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->optionalexp->val;
-
     $$ = ast;
   }
   | Block {
     auto ast = new StmtAST();
     ast->sel = 2;
     ast->block = unique_ptr<BaseAST>($1);
-
-    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -261,13 +199,6 @@ Exp
   : LOrExp {
     auto ast = new ExpAST();
     ast->lorexp = unique_ptr<BaseAST>($1);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->lorexp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->lorexp->val;
-    //
-
     $$ = ast;
   }
   ;
@@ -277,13 +208,6 @@ LOrExp
     auto ast = new LOrExpAST();
     ast->sel = 0;
     ast->landexp = unique_ptr<BaseAST>($1);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->landexp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->landexp->val;
-    //
-
     $$ = ast;
   }
   | LOrExp OROPT LAndExp {
@@ -291,17 +215,6 @@ LOrExp
     ast->sel = 1;
     ast->lorexp = unique_ptr<BaseAST>($1);
     ast->landexp = unique_ptr<BaseAST>($3);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->lorexp->can_compute && ast->landexp->can_compute;
-    if (ast->can_compute)
-        ast->val = ast->lorexp->val || ast->landexp->val;
-    else if (ast->lorexp->can_compute && ast->lorexp->val)
-      ast->can_compute = ast->val = 1;
-    else if (ast->landexp->can_compute && ast->landexp->val)
-      ast->can_compute = ast->val = 1;
-    //
-
     $$ = ast;
   }
   ;
@@ -311,13 +224,6 @@ LAndExp
     auto ast = new LAndExpAST();
     ast->sel = 0;
     ast->eqexp = unique_ptr<BaseAST>($1);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->eqexp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->eqexp->val;
-    //
-
     $$ = ast;
   }
   | LAndExp ANDOPT EqExp {
@@ -325,17 +231,6 @@ LAndExp
     ast->sel = 1;
     ast->landexp = unique_ptr<BaseAST>($1);
     ast->eqexp = unique_ptr<BaseAST>($3);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->landexp->can_compute && ast->eqexp->can_compute;
-    if (ast->can_compute)
-        ast->val = ast->landexp->val && ast->eqexp->val;
-    else if (ast->eqexp->can_compute && !ast->eqexp->val)
-      ast->can_compute = 1, ast->val = 0;
-    else if (ast->landexp->can_compute && !ast->landexp->val)
-      ast->can_compute = 1, ast->val = 0;
-    //
-
     $$ = ast;
   }
   ;
@@ -345,13 +240,6 @@ EqExp
     auto ast = new EqExpAST();
     ast->sel = 0;
     ast->relexp = unique_ptr<BaseAST>($1);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->relexp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->relexp->val;
-    //
-
     $$ = ast;
   }
   | EqExp EQOPT RelExp {
@@ -360,17 +248,6 @@ EqExp
     ast->eqexp = unique_ptr<BaseAST>($1);
     ast->rel = *unique_ptr<string>($2);
     ast->relexp = unique_ptr<BaseAST>($3);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->eqexp->can_compute && ast->relexp->can_compute;
-    if (ast->can_compute){
-      if (ast->rel[0] == '=')
-        ast->val = ast->eqexp->val == ast->relexp->val;
-      else 
-        ast->val = ast->eqexp->val != ast->relexp->val;
-    }
-    //
-
     $$ = ast;
   }
   ;
@@ -380,13 +257,6 @@ RelExp
     auto ast = new RelExpAST();
     ast->sel = 0;
     ast->addexp = unique_ptr<BaseAST>($1);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->addexp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->addexp->val;
-    //
-
     $$ = ast;
   }
   | RelExp RELOPT AddExp {
@@ -395,25 +265,6 @@ RelExp
     ast->relexp = unique_ptr<BaseAST>($1);
     ast->rel = *unique_ptr<string>($2);
     ast->addexp = unique_ptr<BaseAST>($3);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->relexp->can_compute && ast->addexp->can_compute;
-    if (ast->can_compute){
-      if (ast->rel[0] == '>'){
-        if (ast->rel.length() == 1)
-          ast->val = ast->relexp->val > ast->addexp->val;
-        else 
-          ast->val = ast->relexp->val >= ast->addexp->val;
-      }
-      else{
-        if (ast->rel.length() == 1)
-          ast->val = ast->relexp->val < ast->addexp->val;
-        else 
-          ast->val = ast->relexp->val <= ast->addexp->val;
-      }
-    }
-    //
-
     $$ = ast;
   }
   ;
@@ -423,13 +274,6 @@ AddExp
     auto ast = new AddExpAST();
     ast->sel = 0;
     ast->mulexp = unique_ptr<BaseAST>($1);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->mulexp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->mulexp->val;
-    //
-
     $$ = ast;
   }
   | AddExp UOP MulExp {
@@ -438,19 +282,6 @@ AddExp
     ast->addexp = unique_ptr<BaseAST>($1);
     ast->opt = *unique_ptr<string>($2);
     ast->mulexp = unique_ptr<BaseAST>($3);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->addexp->can_compute && ast->mulexp->can_compute;
-    if (ast->can_compute){
-      if (ast->opt[0] == '+')
-        ast->val = ast->addexp->val + ast->mulexp->val;
-      else if (ast->opt[0] == '-')
-        ast->val = ast->addexp->val - ast->mulexp->val;
-      else
-        exit(2);
-    }
-    //
-
     $$ = ast;
   }
   ;
@@ -460,13 +291,6 @@ MulExp
     auto ast = new MulExpAST();
     ast->sel = 0;
     ast->unaryexp = unique_ptr<BaseAST>($1);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->unaryexp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->unaryexp->val;
-    //
-
     $$ = ast;
   }
   | MulExp MULOPT UnaryExp {
@@ -475,19 +299,6 @@ MulExp
     ast->mulexp = unique_ptr<BaseAST>($1);
     ast->opt = *unique_ptr<string>($2);
     ast->unaryexp = unique_ptr<BaseAST>($3);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->mulexp->can_compute && ast->unaryexp->can_compute;
-    if (ast->can_compute){
-      if (ast->opt[0] == '*')
-        ast->val = ast->mulexp->val * ast->unaryexp->val;
-      else if (ast->opt[0] == '/')
-        ast->val = ast->mulexp->val / ast->unaryexp->val;
-      else 
-        ast->val = ast->mulexp->val % ast->unaryexp->val;
-    }
-    //
-
     $$ = ast;
   }
   ;
@@ -497,13 +308,6 @@ UnaryExp
     auto ast = new UnaryExpAST();
     ast->sel = 0;
     ast->pexp = unique_ptr<BaseAST>($1);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->pexp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->pexp->val;
-    //
-
     $$ = ast;
   }
   | UOP UnaryExp {
@@ -511,19 +315,6 @@ UnaryExp
     ast->sel = 1;
     ast->opt = *unique_ptr<string>($1);
     ast->unaryexp = unique_ptr<BaseAST>($2);
-
-    // Pre-Compute Tech
-    ast->can_compute = ast->unaryexp->can_compute;
-    if (ast->can_compute){
-      if (ast->opt[0] == '-')
-        ast->val = -ast->unaryexp->val;
-      else if (ast->opt[0] == '!')
-        ast->val = !ast->unaryexp->val;
-      else 
-        ast->val = ast->unaryexp->val;
-    }
-    //
-
     $$ = ast;
   }
   ;
@@ -540,26 +331,13 @@ PrimaryExp
   : '(' Exp ')' {
     auto ast = new PrimaryExpAST();
     ast->sel = 0;
-    ast->exp = unique_ptr<BaseAST>($2);
-    
-    // Pre-Compute Tech
-    ast->can_compute = ast->exp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->exp->val;
-    //
-    
+    ast->exp = unique_ptr<BaseAST>($2);    
     $$ = ast;
   }
   | Number {
     auto ast = new PrimaryExpAST();
     ast->sel = 1;
     ast->number = ($1);
-
-    // Pre-Compute Tech
-    ast->can_compute = 1;
-    ast->val = ast->number;
-    //
-
     $$ = ast;
   }
   | LVal {
@@ -567,17 +345,6 @@ PrimaryExp
     auto ast = new PrimaryExpAST();
     ast->sel = 2;
     ast->lval = *unique_ptr<string>($1);
-
-    // CAN'T PRECOMPUTE, if and only if it hasn't been computed
-    auto pres_symbtl = present_tbl();
-    auto ret = pres_symbtl->GetItemByName(ast->lval);
-    ast->lval_belong = pres_symbtl->present;
-    if (ret == NULL)
-      exit(4);
-    
-    ast->can_compute = ret->VarType() >> 1;
-    ast->val = ret->VarVal();
-
     $$ = ast;
   }
   ;
@@ -600,11 +367,6 @@ InitVal
   : Exp {
     auto ast = new InitValAST();
     ast->exp = unique_ptr<BaseAST>($1);
-    // Pre-Compute Tech
-    ast->can_compute = ast->exp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->exp->val;
-    //
     $$ = ast;
   }
   ;
@@ -613,11 +375,6 @@ ConstExp
   : Exp {
     auto ast = new ConstExpAST();
     ast->exp = unique_ptr<BaseAST>($1);
-    // Pre-Compute Tech
-    ast->can_compute = ast->exp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->exp->val;
-    //
     $$ = ast;
   }
   ;
@@ -626,11 +383,6 @@ ConstInitVal
   : ConstExp {
     auto ast = new ConstInitValAST();
     ast->constexp = unique_ptr<BaseAST>($1);
-    // Pre-Compute Tech
-    ast->can_compute = ast->constexp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->constexp->val;
-    //
     $$ = ast;
   }
   ;
@@ -662,9 +414,9 @@ BlockItem
     ast->sel = 0;
     $$ = ast;
   }
-  | IfStmt {
+  | GLBIf {
     auto ast = new BlockItemAST();
-    ast->ifstmt = unique_ptr<BaseAST>($1);
+    ast->glbif = unique_ptr<BaseAST>($1);
     ast->sel = 1;
     $$ = ast;
   }
@@ -690,13 +442,6 @@ VarDef
     auto ast = new VarDefAST();
     ast->ident = *unique_ptr<string>($1);
     ast->sel = 0;
-
-    // Insert a non-valued item into present symbal table
-    auto pres_symbtl = present_tbl();
-    auto new_symtbl_item = new SymbolTableItem(1);
-    pres_symbtl->Insert(ast->ident, *new_symtbl_item);
-    ast->can_compute = 0; // can't be decided in compiling time
-
     $$ = ast;
   }
   | IDENT '=' InitVal {
@@ -704,24 +449,6 @@ VarDef
     ast->ident = *unique_ptr<string>($1);
     ast->initval = unique_ptr<BaseAST>($3);
     ast->sel = 1;
-
-    auto pres_symbtl = present_tbl();
-    // Check Whether Already Computed
-    if (ast->initval->can_compute == 0){
-      // Insert a non-valued item into present symbal table
-      auto new_symtbl_item = new SymbolTableItem(1);
-      pres_symbtl->Insert(ast->ident, *new_symtbl_item);
-      // Wait for putting its computing procedure onto the stack?
-      ast->can_compute = 0;
-    }
-    else{
-    // Insert an already-valued item into present symbal table
-      ast->can_compute = 1;
-      ast->val = ast->initval->val;
-      auto new_symtbl_item = new SymbolTableItem(1, ast->val);
-      pres_symbtl->Insert(ast->ident, *new_symtbl_item);
-    }
-
     $$ = ast;
   }
   ;
@@ -754,19 +481,6 @@ ConstDef
     auto ast = new ConstDefAST();
     ast->ident = *unique_ptr<string>($1);
     ast->constinitval = unique_ptr<BaseAST>($3);
-
-    // Check Whether Already Computed
-    if (ast->constinitval->can_compute == 0)
-      exit(5);
-    // Because ConstDef must be computed in the compiling time, 
-      // so we don't use ast->can_compute, it must be 1
-
-    // Insert a const item into present symbal table
-    
-    auto pres_symbtl = present_tbl();
-    auto new_symtbl_item = new SymbolTableItem(0, ast->constinitval->val);
-    pres_symbtl->Insert(ast->ident, *new_symtbl_item);
-
     $$ = ast;
   }
   ;
@@ -800,20 +514,11 @@ OptionalExp
   : Exp {
     auto ast = new OptionalExpAST();
     ast->exp = unique_ptr<BaseAST>($1);
-    // Pre-Compute Tech
-    ast->can_compute = ast->exp->can_compute;
-    if (ast->can_compute)
-      ast->val = ast->exp->val;
-    //
     $$ = ast;
   }
   | {
     auto ast = new OptionalExpAST();
     ast->exp = NULL;
-    ast->can_compute = 1;
-    ast->val = 0;
-    // Cheat Code
-
     $$ = ast;
   }
   ;

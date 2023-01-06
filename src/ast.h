@@ -97,7 +97,7 @@
           - 这种情况是没有问题的，于是我们还是需要在parsing的过程中，预处理出每一个Lval所属的符号表
             （这个是不难的），到时候直接从那里面取就可以了（
         
-        15. How to Handle `if-else`
+        * (寄, Solution 见19) 15. How to Handle `if-else`
           - 我们可以将 合法的 `if (exp) stmt [else stmt]` 这个结构 看成一个 `合法的` 括号序列，
                 因为我们定义了，空悬二义性可以通过匹配最近的 if 来解决
           - 如此一来，我们可以极大地 simplify 我们的 Model:
@@ -128,8 +128,7 @@
             17.5 - Solution:
               1. 对于每个 Block 的 SymTbl，我们开一个 Stack 表示这个 Block 中目前执行的语句
                 的可执行状态 state，具体定义见 `symtab.h`
-              2. 然后定义语句不用管，因为定义语句已经把这个变量的作用域局限在
-                这个块了，所以不会造成 outer 的影响，而内部执不执行反正也是统一的
+              2. 然后定义语句不用管
               3. 对于 `赋值语句`， 我们不能提前确定它的结果 (或者说把它的结果更新到 Parsing SymTbl 里)
                 或者说，要把 Lval 重修丢入 can_compute 的大牢
                 当且仅当：
@@ -148,9 +147,36 @@
             在 SymbleTableItem 的 sel 的 第二位置为 0。
           这种情况下我们的 IR_generater 则会把这个 Var load 进来，所以我们还是需要之前就算确定了一个赋值语句的结果
             也要把它存到memory里去 （见 void StmtAST :: IRDump() const ） 
+
+        19. 对于 15 文法的修改：我们跑起来实例发现 15 是有小疏漏了，其实就是 一个地方：
+              括号序列的非匹配左项并不一定是连续的，所以不一定是先进行一系列 IfStmt 再到 IfElseStmt 
+              然后就都能匹配了，可能中间有曲折的过程 ： 
+                - 每个左括号 (If) 的可匹配性并不一定是单调的！！！
+                - 换言之，也就是每个左括号可匹配性并不一定是先0后1，可能是01交叉的
+                - 这就需要我们设计新文法！
+            新文法如下：
+                - GLBIf // 一个完全未知的括号序列，`而且我们强迫 IfStmt 必须有至少一个未匹配If项`
+                  : IfStmt 
+                  | IfElseStmt
+                - IfStmt  // 至少有一个未匹配项的括号序列
+                  : IF '(' Exp ')' GLBIf // sel = 0
+                            // 未匹配项即是这个 IF 本身
+                  | IF '(' Exp ') IfElseStmt ELSE IfStmt // sel = 1
+                            // 未匹配项是 Else 后面的 IfStmt 的未匹配项
+                - IfElseStmt // 完美匹配的括号序列，这里由于定义和之前文法一样，所以不用修改
+                  : IF '(' Exp ')' IfElseStmt ELSE IfElseStmt // sel = 0
+                  : Stmt // sel = 1
+
+                - BlockItem -> Decl | GLBIf
+        
+        20. 但简单把上述文法写在 sysy.y 里还是会有问题，因为 midRule没有这么简单好用，于是我们的Solution:
+            见 sysy.y 的实现
+          
+        21. 
 */
 
 #define MODE 1 // 2 为关掉优化的模式，1为优化模式
+#define Pr pair<int,int> 
 
 class BaseAST {
  public:
@@ -160,21 +186,23 @@ class BaseAST {
   virtual ~BaseAST() = default;
   virtual void Dump(int sj) const = 0;
   virtual void IRDump() const = 0;
+  virtual void PreCompute() = 0;
   inline void HandleSJ(int sj) const ;
   int can_compute /* ___can be computed in compiling time___ ? for types below */, val;
   // After If-Else, can_compute can be extent to 'decided when compiling'
   inline int PreComputeProcedure() const;
+  inline void PreComputeAssign(std::unique_ptr<BaseAST> &child);
   /*
   Already can_compute implemented can_compute TYPE:
     Stmt
     Exp
     LOrExp ~ PrimaryExp
     InitVal
-    ConstExp
-    ConstInitVal
+    Optional
     VarDef
     - IfStmt
     - IfElseStmt
+    x No GLBIf, for we don't need to pre-judge where to go inside it.
 
   When 'can_compute == 0', means:
     1. lack of stack var using (good)
@@ -195,6 +223,7 @@ class CompUnitAST : public BaseAST {
   std::unique_ptr<BaseAST> func_def;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class FuncDefAST : public BaseAST {
@@ -204,6 +233,7 @@ class FuncDefAST : public BaseAST {
   std::unique_ptr<BaseAST> block;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 // Lv1_Left
@@ -212,6 +242,7 @@ class FuncTypeAST : public BaseAST {
   std::string type;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class BlockAST : public BaseAST {
@@ -222,17 +253,29 @@ class BlockAST : public BaseAST {
   int block_id;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 // ------------------------ Lv_6 Adding -----------------------------------------------
 
-class IfStmtAST : public BaseAST {
+class GLBIfAST : public BaseAST {
  public:
-  std::unique_ptr<BaseAST> exp, ifstmt, ifelsestmt;
+  std::unique_ptr<BaseAST> ifstmt, ifelsestmt;
   int sel;
 
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
+};
+
+class IfStmtAST : public BaseAST {
+ public:
+  std::unique_ptr<BaseAST> exp, ifstmt, ifelsestmt, glbif;
+  int sel;
+
+  void Dump(int sj) const override;
+  void IRDump() const override;
+  void PreCompute() override;
 };
 
 class IfElseStmtAST : public BaseAST {
@@ -242,6 +285,7 @@ class IfElseStmtAST : public BaseAST {
 
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 
@@ -255,6 +299,7 @@ class StmtAST : public BaseAST {
   int sel;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 
@@ -270,6 +315,7 @@ class ExpAST : public BaseAST {
   std::unique_ptr<BaseAST> lorexp;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class LOrExpAST : public BaseAST {
@@ -278,6 +324,7 @@ class LOrExpAST : public BaseAST {
   int sel;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class LAndExpAST : public BaseAST {
@@ -286,6 +333,7 @@ class LAndExpAST : public BaseAST {
   int sel;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class EqExpAST : public BaseAST {
@@ -295,6 +343,7 @@ class EqExpAST : public BaseAST {
   int sel;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class RelExpAST : public BaseAST {
@@ -304,6 +353,7 @@ class RelExpAST : public BaseAST {
   int sel;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class AddExpAST : public BaseAST {
@@ -313,6 +363,7 @@ class AddExpAST : public BaseAST {
   int sel;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class MulExpAST : public BaseAST {
@@ -322,6 +373,7 @@ class MulExpAST : public BaseAST {
   int sel;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 // useless class
@@ -339,6 +391,7 @@ class UnaryExpAST : public BaseAST {
   int sel;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class PrimaryExpAST : public BaseAST {
@@ -350,6 +403,7 @@ class PrimaryExpAST : public BaseAST {
   int sel;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 // --------------------------------- Lv_4  Const and Var-------------------------------------
@@ -364,15 +418,17 @@ class DeclAST : public BaseAST {
 
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class BlockItemAST : public BaseAST {
  public:
-  std::unique_ptr<BaseAST> decl, ifstmt;
+  std::unique_ptr<BaseAST> decl, glbif;
   int sel;
 
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class InitValAST : public BaseAST {
@@ -381,6 +437,7 @@ class InitValAST : public BaseAST {
 
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class ConstExpAST : public BaseAST {
@@ -389,6 +446,7 @@ class ConstExpAST : public BaseAST {
 
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class ConstInitValAST : public BaseAST {
@@ -397,6 +455,7 @@ class ConstInitValAST : public BaseAST {
 
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class ConstDefAST : public BaseAST {
@@ -406,6 +465,7 @@ class ConstDefAST : public BaseAST {
 
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class ConstDeclAST : public BaseAST {
@@ -415,6 +475,7 @@ class ConstDeclAST : public BaseAST {
   int child_num;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 class VarDefAST : public BaseAST {
@@ -425,6 +486,7 @@ class VarDefAST : public BaseAST {
 
   void Dump(int sj) const override;
   void IRDump() const override;  
+  void PreCompute() override;
 };
 
 // class BTypeAST : public BaseAST {
@@ -441,6 +503,7 @@ class VarDeclAST : public BaseAST {
   int child_num;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 
@@ -452,6 +515,7 @@ class OptionalExpAST : public BaseAST {
   std::unique_ptr<BaseAST> exp;
   void Dump(int sj) const override;
   void IRDump() const override;
+  void PreCompute() override;
 };
 
 

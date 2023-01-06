@@ -27,8 +27,7 @@ void SymbolTable :: Insert(std::string &name, SymbolTableItem &STitem){
 }
 
 SymbolTableItem* SymbolTable :: GetItemByName(std::string &name){
-    present_state = reach_st.top();
-    for(SymbolTable* now = this; now; now = now->father, present_state = NewState(now->reach_st.top(), present_state))
+    for(SymbolTable* now = this; now; now = now->father)
         if (now->ST.count(name)){
             this->present = now;
             return now->ST[name];
@@ -36,10 +35,10 @@ SymbolTableItem* SymbolTable :: GetItemByName(std::string &name){
     return NULL;
 }
 
-void SymbleTable :: Push(int CANN, int VALL){
+void SymbolTable :: Push(int CANN, int VALL){
     reach_st.push(NewState(reach_st.top(), NewElement(CANN, VALL)));
 }
 
-void SymbleTable :: Pop(){
+void SymbolTable :: Pop(){
     reach_st.pop();
 }
