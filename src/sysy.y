@@ -35,7 +35,7 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
   std::vector< std::unique_ptr<BaseAST> > *ast_list; // 用来返回vector指针，vector用来存所有子节点
 }
 %define parse.error verbose
-%token INT RETURN CONST IF ELSE
+%token INT RETURN CONST IF ELSE WHILE BREAK CONTINUE
 %token <str_val> IDENT UOP MULOPT RELOPT EQOPT ANDOPT OROPT
 %token <int_val> INT_CONST
 
@@ -51,6 +51,7 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
 %type <ast_val> OptionalExp
 // Lv_6 If-else
 %type <ast_val> IfStmt IfElseStmt GLBIf
+// Lv_7 While 直接加在了 Stmt 里
 
 %type <str_val> LVal BType
 %type <int_val> Number
@@ -193,6 +194,23 @@ Stmt
     ast->block = unique_ptr<BaseAST>($1);
     $$ = ast;
   }
+  | WHILE '(' Exp ')' GLBIf {
+    auto ast = new StmtAST();
+    ast->sel = 4;
+    ast->exp = unique_ptr<BaseAST>($3);
+    ast->glbif = unique_ptr<BaseAST>($5);
+    $$ = ast;
+  }
+  | CONTINUE ';' {
+    auto ast = new StmtAST();
+    ast->sel = 5;
+    $$ = ast;
+  }
+  | BREAK ';' {
+    auto ast = new StmtAST();
+    ast->sel = 6;
+    $$ = ast;
+  } 
   ;
 
 Exp

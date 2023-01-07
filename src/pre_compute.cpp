@@ -6,6 +6,7 @@
 using namespace std;
 
 int total_blk_num = 0;
+int bin_precompute_for_var = 0; // 用来在 while(exp) 中关闭 exp 对于变量Var 依赖的提前计算功能
 
 inline void BaseAST :: PreComputeAssign(std::unique_ptr<BaseAST> &child){
     if (child->can_compute == 1){
@@ -19,7 +20,7 @@ inline void BaseAST :: PreComputeAssign(std::unique_ptr<BaseAST> &child){
 
 void CompUnitAST :: PreCompute(){
     glbsymbtl->ST_name = "GLOBAL_Table";
-    BaseAST::glbsymbtl->reach_st.push(1);
+    BaseAST::glbsymbtl->reach_st.push(1); // 全局 Block, 我们也假设必然可达
     push_into_tbl_stk(glbsymbtl, 0); // 全局变量进入
     
     func_def->PreCompute();
@@ -113,7 +114,7 @@ void StmtAST :: PreCompute(){
         block->PreCompute();
         can_compute = 0; // useless
     }
-    else{
+    else if (sel == 0){
         exp->PreCompute();
 
         auto pres_symbtl = present_tbl();
@@ -154,6 +155,22 @@ void StmtAST :: PreCompute(){
                 // Second is that, no consequence can be pushed onto the Symbol Table
             }
         }
+    }
+    else if (sel == 4){ 
+        // we meet a while, but can do nothing for it 
+        present_tbl()->Push(0, 0); 
+        // must push element 2 (unknown times) into the stack, even before the exp
+        bin_precompute_for_var ++;
+        exp->PreCompute();
+        glbif->PreCompute();
+        bin_precompute_for_var --;
+        present_tbl()->Pop();
+    }
+    else if (sel == 5){
+        // just do nothing
+    }
+    else if (sel == 6){
+        // just do nothing
     }
 }
 
@@ -323,7 +340,8 @@ void PrimaryExpAST :: PreCompute(){
         if (ret == NULL)
             exit(4);
         
-        can_compute = ret->VarType() >> 1;
+        can_compute = (ret->VarType() >> 1) & (1 ^ ((bin_precompute_for_var!=0) & ret->VarType() & 1));
+        // 如果我们暂时关了 precompute功能，且要用的是 Var，那么这个 PrimaryExp 也是不能优化的
         val = ret->VarVal();
     }
 }

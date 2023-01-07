@@ -29,7 +29,7 @@ class SymbolTable {
  public:
     std::unordered_map < std::string, SymbolTableItem* > ST; // 管理 Lval
     std::stack <int> reach_st; // 用来实现可达管理
-                            // 1 -> 必可达 / 0 -> 必不可达 / 2 -> 我不好说...
+                            // 1 -> 必可达(且到达次数严格为 1) / 0 -> 必不可达 / 2 -> 完全不确定可到达的次数
                             // 在初始进入一个 Block，或者有 If 语句时，处理这个Stack
     std::string ST_name;
     SymbolTable *father;

@@ -71,13 +71,25 @@ void StmtAST :: Dump(int sj) const {
     else if (sel == 1){
         optionalexp->Dump(sj + 1);
     }
-    else{
+    else if (!sel){
         HandleSJ(sj+1);
         std::cout << lval << endl;
         HandleSJ(sj+1);
         std::cout << '=' << endl;
         exp->Dump(sj + 1);        
-    }  
+    }
+    else if (sel == 4){
+        exp->Dump(sj + 1);
+        glbif->Dump(sj + 1);
+    }
+    else if (sel == 5){
+        HandleSJ(sj+1);
+        std::cout << "CONTINUE" << endl;
+    }
+    else{
+        HandleSJ(sj+1);
+        std::cout << "BREAK" << endl;
+    }
     std::cout << endl;
     HandleSJ(sj);
     std::cout << "}";

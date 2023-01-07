@@ -300,7 +300,7 @@ class IfElseStmtAST : public BaseAST {
 
 class StmtAST : public BaseAST {
  public:
-  std::unique_ptr<BaseAST> exp, optionalexp, block;
+  std::unique_ptr<BaseAST> exp, optionalexp, block, glbif;
   std::string lval;
   SymbolTable *lval_belong;
   int sel;

@@ -24,7 +24,7 @@
         4.  int var_num, is_01;
             int var_ins[300005];
            这些是用来维护，IR_generating过程中，所有 `%number` 项目的信息
-        6. 
+        6.
           
 */
 
@@ -38,8 +38,10 @@ stack< Pr > blk_info;
 
 string now_btype;
 int BLKID, ID_instr, Func_Ret;
-int If_num = 0;
+int If_num = 0, While_NUM = 0;
 int OR_num = 0, AND_num = 0;
+int Continue_num = 0, Break_num = 0;
+stack <int> while_stack;
 
 inline void UPDATE(){
     Pr &u = TOP;
@@ -100,7 +102,7 @@ void FuncDefAST :: IRDump() const {
     std::cout << " %" << "entry:" << endl;
     Func_Ret = 0;
     block->IRDump();
-    std::cout << "    ret 0" << endl;
+    std::cout << "    ret 0" << endl; // 愿称你为托底天王
     std::cout << "}" << endl;
 }
 void FuncTypeAST :: IRDump() const {
@@ -165,26 +167,57 @@ void StmtAST :: IRDump() const {
 
         exp->IRDump();
         // store %1, @x
-
         string alter_one = lval;
-
-        // cout << "STMT Belong to Block: " << lval_belong->ST_name << endl;
-
         if(is_01 >> 1)
             std::cout << "    store " << var_ins[var_num - 1] << ", @" << lval_belong->ST_name << '_' << lval << endl;
         else
             std::cout << "    store %" << var_num - 1 << ", @" << lval_belong->ST_name << '_' << lval << endl;
-        // And you can consider why there's not other condition?
-        // BBBBBecause, all the tree nodes' 'can_compute == MODE' are already determined, after `sysy.y`
-            // scans the source code.
-
-        // But I finally add this function, mainly for testing my code, without pre-compiling tech
     }
     else if (sel == 1){
         // 这种情况甚至不用 generate code
     }
-    else
+    else if (sel == 2)
         block->IRDump();
+    else if (sel == 4){ // while
+        int WHILENUM = ++While_NUM;
+        while_stack.push(WHILENUM);
+
+        // jump %WHILE_BEGIN_<num>
+        std::cout << "    jump %WHILE_BEGIN_" << WHILENUM << endl;
+        // %WHILE_BEGIN_<num>:
+        std::cout << " %" << "WHILE_BEGIN_" << WHILENUM << ':' << endl;
+
+        exp->IRDump();
+
+        if (is_01 >> 1)
+            std::cout << "    br " << var_ins[var_num - 1] << ", %" << "WHILE_THEN_" << WHILENUM << ", %" << "WHILE_END_" << WHILENUM << endl;
+        else
+            std::cout << "    br %" << var_num - 1 << ", %" << "WHILE_THEN_" << WHILENUM << ", %" << "WHILE_END_" << WHILENUM << endl;
+        
+        // %WHILE_THEN_<num>:
+        std::cout << " %" << "WHILE_THEN_" << WHILENUM << ':' << endl;
+        glbif->IRDump();
+        // jump %WHILE_BEGIN_<num>
+        std::cout << "    jump %WHILE_BEGIN_" << WHILENUM << endl;
+
+        // %WHILE_END_<num>:
+        std::cout << " %" << "WHILE_END_" << WHILENUM << ':' << endl;
+        while_stack.pop();
+    }
+    else if (sel == 5){ // continue
+        if (while_stack.size() == 0)
+            exit(8);
+        Continue_num ++;
+        std::cout << "    jump %WHILE_BEGIN_" << while_stack.top() << endl;
+        std::cout << " %" << "AFTER_CONTINUE_" << Continue_num << ':' << endl;
+    }
+    else if (sel == 6){ // break
+        if (while_stack.size() == 0)
+            exit(8);
+        Break_num ++;
+        std::cout << "    jump %WHILE_END_" << while_stack.top() << endl;
+        std::cout << " %" << "AFTER_BREAK_" << Break_num << ':' << endl;
+    }
 }
 
 inline void out_binary_IR(int fi, int se, string op, int is_01_fi = 0, int is_01_se = 0){
