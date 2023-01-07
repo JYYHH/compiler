@@ -172,7 +172,14 @@
         20. 但简单把上述文法写在 sysy.y 里还是会有问题，因为 midRule没有这么简单好用，于是我们的Solution:
             见 sysy.y 的实现
           
-        21. 
+        21. 将预计算系统移到了 `pre_compute.cpp`
+        22. Generate IR 实现了短路求值，并且在 PreCompute() 中也进行了这样同步的优化：
+          - 比如 LOrExp || LAndExp, 理论上我们知其一为1就可以在 Parsing 时优化了，但我们不能这么做，
+            因为这 ·违背了语义· 
+          - 所以我们只能模拟短路功能，要么是 两个子步骤都可以 PreCompute() 出来 【这预示着必然没有函数调用等有后效性的复杂过程】
+            要么是，LOrExp 可以 PreCompute() 出来且为 1，那么我们显然也可以确定 Running 的时候后面的 LAndExp也不会执行，所以可以优化掉
+        
+        23. 
 */
 
 #define MODE 1 // 2 为关掉优化的模式，1为优化模式
