@@ -65,6 +65,23 @@ string glb_funn;
 
 CompUnit
   : CompUnitList {
+    std::string lib_func_name = "getint";
+    BaseAST::glbsymbtl->Insert(lib_func_name, *(new SymbolTableItem(40)));
+    lib_func_name = "getch";
+    BaseAST::glbsymbtl->Insert(lib_func_name, *(new SymbolTableItem(40)));
+    lib_func_name = "getarray";
+    BaseAST::glbsymbtl->Insert(lib_func_name, *(new SymbolTableItem(40)));
+    lib_func_name = "putint";
+    BaseAST::glbsymbtl->Insert(lib_func_name, *(new SymbolTableItem(32)));
+    lib_func_name = "putch";
+    BaseAST::glbsymbtl->Insert(lib_func_name, *(new SymbolTableItem(32)));
+    lib_func_name = "putarray";
+    BaseAST::glbsymbtl->Insert(lib_func_name, *(new SymbolTableItem(32)));
+    lib_func_name = "starttime";
+    BaseAST::glbsymbtl->Insert(lib_func_name, *(new SymbolTableItem(32)));
+    lib_func_name = "stoptime";
+    BaseAST::glbsymbtl->Insert(lib_func_name, *(new SymbolTableItem(32)));
+
     auto comp_unit = make_unique<CompUnitAST>();
     comp_unit->func_def = ($1);
     comp_unit->child_num = (int)(*(comp_unit->func_def)).size();

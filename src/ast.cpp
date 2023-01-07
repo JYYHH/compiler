@@ -1,6 +1,7 @@
 #include <string>
 #include <memory>
 #include <iostream>
+#include <cstdio>
 #include "ast.h"
 
 /*
@@ -90,6 +91,9 @@ inline int BaseAST :: PreComputeProcedure() const{
 // ---------------------Begin the Part of Generting the IR (koopa)---------------------------------
 
 void CompUnitAST :: IRDump() const{
+    printf("decl @getint(): i32\ndecl @getch(): i32\ndecl @getarray(*i32): i32\ndecl @putint(i32)\ndecl @putch(i32)\ndecl @putarray(i32, *i32)\ndecl @starttime()\ndecl @stoptime()\n\n\n");
+
+
     push_into_tbl_stk(glbsymbtl, 0);
     std::vector< std::unique_ptr<BaseAST> > &now_vec = *func_def;
     for (int i=0; i<child_num; i++)
