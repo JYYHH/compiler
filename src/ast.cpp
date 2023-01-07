@@ -114,7 +114,11 @@ void FuncDefAST :: IRDump() const {
     }
 
     std::cout << ')';
-    func_type->IRDump();
+
+    if (func_type == "int")
+        std::cout << ": i32 ", now_type = "int";
+    else 
+        std::cout << ' ', now_type = "void";
 
     std::cout << "{" << endl;
     std::cout << " %" << "entry:" << endl;
@@ -139,12 +143,6 @@ void FuncFParamAST :: IRDump() const {
         funcparam_btype = "i32";
     else 
         funcparam_btype = "Please Check your Func Param Btype";
-}
-void FuncTypeAST :: IRDump() const {
-    if (type == "int")
-        std::cout << ": i32 ", now_type = "int";
-    else 
-        std::cout << ' ', now_type = "void";
 }
 void BlockAST :: IRDump() const {
     push_into_tbl_stk(symbtl, 1);
@@ -576,24 +574,36 @@ std::string btype_transfer(std::string &BTYPE){
     if (BTYPE == "int") 
         return "i32";
     else
-        return "i32";
+        return BTYPE;
 }
 
 void VarDefAST :: IRDump() const {
-    //@x = alloc i32
-    std::cout << "    @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << endl;
-    // 保证 ident 在当前 symbol table 里
-    if (can_compute == MODE)
-        // Although Already in SymTb, we should also make sure it's stored
-        std::cout << "    store " << val << ", @" << present_tbl()->ST_name << '_' << ident << endl;
-    else if (sel){
-        initval->IRDump();
-        // The same as case in StmtAST, we can make sure this can't be a constant
-        // Also finally implemented such a f**k if, for debugging
-        if(is_01 >> 1)
-            std::cout << "    store " << var_ins[var_num - 1] << ", @" << present_tbl()->ST_name << '_' << ident << endl;
-        else
-            std::cout << "    store %" << var_num - 1 << ", @" << present_tbl()->ST_name << '_' << ident << endl;
+    if (present_tbl() == glbsymbtl){
+        // 全局的变量
+        if (can_compute) // 这个不管选不选优化都不能关掉，因为全局变量的赋值必须当场解决
+            std::cout << "global @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << ", " << val << endl;
+        else if (sel == 0)
+            std::cout << "global @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << ", zeroinit" << endl;
+        else 
+            exit(12);
+    }
+    else{
+        //        函数内的变量
+        //@x = alloc i32
+        std::cout << "    @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << endl;
+        // 保证 ident 在当前 symbol table 里
+        if (can_compute == MODE)
+            // Although Already in SymTb, we should also make sure it's stored
+            std::cout << "    store " << val << ", @" << present_tbl()->ST_name << '_' << ident << endl;
+        else if (sel){
+            initval->IRDump();
+            // The same as case in StmtAST, we can make sure this can't be a constant
+            // Also finally implemented such a f**k if, for debugging
+            if(is_01 >> 1)
+                std::cout << "    store " << var_ins[var_num - 1] << ", @" << present_tbl()->ST_name << '_' << ident << endl;
+            else
+                std::cout << "    store %" << var_num - 1 << ", @" << present_tbl()->ST_name << '_' << ident << endl;
+        }
     }
 }
 

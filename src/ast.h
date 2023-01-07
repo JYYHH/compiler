@@ -183,8 +183,12 @@
           均为左递归实现，因为这样可以保证从左到右的顺序
 
         24. 将函数的 Param 放到了该函数的第一个Block里
-          
+        
+        25. 假设全局变量，赋的值一定也可计算?
 
+        26. 原文档给的文法有一点逆天，其实是有部分歧义的：
+          26.1 : 我们在归结全局变量int和全局函数(返回值是int那种) 会产生 规约 & 规约 冲突，这是由于不知道将前面的 INT 归结为什么导致的
+          26.1 Solution : 把 Btype 加上 void，然后删了 FuncType （乐
 */
 
 #define MODE 2 // 2 为关掉优化的模式，1为优化模式
@@ -241,7 +245,7 @@ class CompUnitAST : public BaseAST {
 
 class FuncDefAST : public BaseAST {
  public:
-  std::unique_ptr<BaseAST> func_type;
+  std::string func_type;
   std::vector< std::unique_ptr<BaseAST> > *funcfparam;
   std::string ident;
   std::unique_ptr<BaseAST> block;
@@ -260,13 +264,6 @@ class FuncFParamAST : public BaseAST {
 };
 
 // Lv1_Left
-class FuncTypeAST : public BaseAST {
- public:
-  std::string type;
-  void Dump(int sj) const override;
-  void IRDump() const override;
-  void PreCompute() override;
-};
 
 class BlockAST : public BaseAST {
  public:

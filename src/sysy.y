@@ -19,7 +19,6 @@ using namespace std;
 
 stack< SymbolTable* > * BaseAST::glbstst = new stack< SymbolTable* >;
 SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
-string glb_funn;
 
 %}
 
@@ -41,7 +40,7 @@ string glb_funn;
 %token <int_val> INT_CONST
 
 // 非终结符的类型定义
-%type <ast_val> FuncDef FuncType Block Stmt
+%type <ast_val> FuncDef Block Stmt
 %type <ast_list> Block_inter VarDecl_inter ConstDecl_inter
 // 表达式定义
 %type <ast_val> Exp PrimaryExp UnaryExp MulExp AddExp RelExp EqExp LAndExp LOrExp
@@ -55,7 +54,7 @@ string glb_funn;
 // Lv_7 While 直接加在了 Stmt 里
 // Lv_8 Globel Var & Function
 %type <ast_list> CompUnitList FuncFParams FuncRParams FuncFParamsTrue FuncRParamsTrue
-%type <ast_val> FuncFParam
+%type <ast_val> FuncFParam FuncOrDecl
 
 %type <str_val> LVal BType
 %type <int_val> Number
@@ -90,29 +89,38 @@ CompUnit
   ;
 
 CompUnitList
-  : FuncDef {
+  : FuncOrDecl {
     auto ret = new std::vector< std::unique_ptr<BaseAST> >;
     (*ret).push_back( unique_ptr<BaseAST>($1) );
     $$ = ret;
   }
-  | CompUnitList FuncDef{
+  | CompUnitList FuncOrDecl{
     auto ret = ($1);
     (*ret).push_back( unique_ptr<BaseAST>($2) );
     $$ = ret;
   }
   ;
 
+FuncOrDecl
+  : Decl {
+    $$ = $1;
+  }
+  | FuncDef {
+    $$ = $1;
+  }
+  ;
+
 FuncDef
-  : FuncType IDENT '(' FuncFParams ')' Block {
+  : BType IDENT '(' FuncFParams ')' Block {
     auto ast = new FuncDefAST();
-    ast->func_type = unique_ptr<BaseAST>($1);
+    ast->func_type = *unique_ptr<string>($1);
     ast->ident = *unique_ptr<string>($2);
     ast->funcfparam = ($4);
     ast->child_num = (int)(*(ast->funcfparam)).size();
     ast->block = unique_ptr<BaseAST>($6);
 
     // Parsing 时直接把函数名字加到Global符号表里
-    auto INSERT_ITEM = new SymbolTableItem((1 << 5) + (glb_funn == "int") * (1 << 3)); // 把全局函数名称加到符号表里
+    auto INSERT_ITEM = new SymbolTableItem((1 << 5) + (ast->func_type == "int") * (1 << 3)); // 把全局函数名称加到符号表里
     BaseAST::glbsymbtl->Insert(ast->ident, *INSERT_ITEM);
     $$ = ast;
   }
@@ -149,19 +157,6 @@ FuncFParam
   }
   ;
 
-FuncType
-  : INT {
-    auto ast = new FuncTypeAST();
-    glb_funn = ast->type = "int";
-    $$ = ast;
-  }
-  | VOID {
-    auto ast = new FuncTypeAST();
-    glb_funn = ast->type = "void";
-    $$ = ast;
-  }
-  ;
-
 Block
   : '{' Block_inter '}' {
     auto ast = new BlockAST();
@@ -171,23 +166,6 @@ Block
   }
   ;
 
-// subroutine:
-//   %empty {
-//     exp_state.push(NOW_exp);
-//     present_tbl()->Push(!!NOW_exp.first, !!NOW_exp.second);
-//   }
-// ;
-
-// subroutine2:
-//   %empty {
-//     NOW_exp = exp_state.top();
-//     exp_state.pop();
-//     present_tbl()->Pop();
-
-//     exp_state.push(Pr(NOW_exp.first, !NOW_exp.second));
-//     present_tbl()->Push(NOW_exp.first, !NOW_exp.second);
-//   }
-// ;
 
 GLBIf 
   : IfStmt {
@@ -513,6 +491,10 @@ ConstInitVal
 BType
   : INT {
     auto nnnn_str = new std::string("int");
+    $$ = nnnn_str;
+  }
+  | VOID {
+    auto nnnn_str = new std::string("void");
     $$ = nnnn_str;
   }
   ;

@@ -34,7 +34,9 @@ void CompUnitAST :: Dump(int sj) const{
 void FuncDefAST :: Dump(int sj) const {
     HandleSJ(sj);
     std::cout << "FuncDefAST {" << endl;
-    func_type->Dump(sj+1);
+    // func_type->Dump(sj+1);
+    HandleSJ(sj + 1);
+    std::cout << func_type;
     std::cout << ',' << endl;
     HandleSJ(sj+1);
     std::cout << "FuncName = " << ident << ',' << endl;
@@ -55,12 +57,6 @@ void FuncFParamAST :: Dump(int sj) const {
     HandleSJ(sj);
     std::cout << "FuncFParamAST { ";
     std::cout << "Type: " << btype << ", Name: " << ident;
-    std::cout << " }";
-}
-void FuncTypeAST :: Dump(int sj) const {
-    HandleSJ(sj);
-    std::cout << "FuncTypeAST { ";
-    std::cout << type;
     std::cout << " }";
 }
 void BlockAST :: Dump(int sj) const {

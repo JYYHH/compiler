@@ -47,17 +47,12 @@ void CompUnitAST :: PreCompute(){
 }
 
 void FuncDefAST :: PreCompute(){
-    func_type->PreCompute();
     glb_funcfparam = funcfparam;
     block->PreCompute();
 }
 
 void FuncFParamAST :: PreCompute(){
     funcparam_name = ident;
-}
-
-void FuncTypeAST :: PreCompute(){
-
 }
 
 void BlockAST :: PreCompute(){
@@ -384,6 +379,9 @@ void PrimaryExpAST :: PreCompute(){
         can_compute = (ret->VarType() >> 1) & (1 ^ ((bin_precompute_for_var != 0) & ret->VarType())) & (lval_belong != BaseAST::glbsymbtl);
         // 如果我们暂时关了 precompute功能 (主要可能是因为While循环) ，且要用的是 Var，那么这个 PrimaryExp 也是不能优化的
         // 同时 全局变量 (在最后一个判断里) && 函数参数(VarType = (1 << 6) | 1) 也不能优化
+        if (!(ret->VarType() & 1))
+            can_compute = 1;
+        // 但是全局常量还是能用的
         val = ret->VarVal();
     }
 }
