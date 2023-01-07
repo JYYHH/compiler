@@ -195,8 +195,8 @@ void StmtAST :: IRDump() const {
             }
         }
         else{
-            if (optionalexp != NULL)
-                exit(10);
+            // if (optionalexp != NULL)
+            //     exit(10);
             std::cout << "    ret" << endl;
         }
 
