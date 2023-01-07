@@ -191,7 +191,7 @@
           26.1 Solution : 把 Btype 加上 void，然后删了 FuncType （乐
 */
 
-#define MODE 2 // 2 为关掉优化的模式，1为优化模式
+#define MODE 1 // 2 为关掉优化的模式，1为优化模式
 #define Pr pair<int,int> 
 
 class BaseAST {
