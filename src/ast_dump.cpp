@@ -19,8 +19,14 @@ void CompUnitAST :: Dump(int sj) const{
     for(int i=1;i<=300;i++) sj_map[i] = sj_map[i-1] + "  ";
 
     HandleSJ(sj);
-    std::cout << "CompUnitAST {" << endl;
-    func_def->Dump(sj+1);
+    std::cout << "CompUnitAST {" << endl;  
+    std::vector< std::unique_ptr<BaseAST> > &now_vec = *func_def; 
+    HandleSJ(sj+1);
+    std::cout << "TotolComponentNum = " << child_num << endl;
+    for (int i=0; i<child_num; i++){
+        now_vec[i]->Dump(sj + 1);
+        std::cout << "********** End of Child " << i <<endl;
+    }
     std::cout << endl;
     HandleSJ(sj);
     std::cout << "}";
@@ -32,10 +38,24 @@ void FuncDefAST :: Dump(int sj) const {
     std::cout << ',' << endl;
     HandleSJ(sj+1);
     std::cout << "FuncName = " << ident << ',' << endl;
+    std::vector< std::unique_ptr<BaseAST> > &now_vec = *funcfparam; 
+    HandleSJ(sj+1);
+    std::cout << "FuncParamNum = " << child_num << endl;
+    for (int i=0; i<child_num; i++){
+        now_vec[i]->Dump(sj + 1);
+        std::cout << "********** End of Child " << i <<endl;
+    }
+    std::cout << endl;
     block->Dump(sj+1);
     std::cout << endl;
     HandleSJ(sj);
     std::cout << "}";
+}
+void FuncFParamAST :: Dump(int sj) const {
+    HandleSJ(sj);
+    std::cout << "FuncFParamAST { ";
+    std::cout << "Type: " << btype << ", Name: " << ident;
+    std::cout << " }";
 }
 void FuncTypeAST :: Dump(int sj) const {
     HandleSJ(sj);
@@ -48,7 +68,7 @@ void BlockAST :: Dump(int sj) const {
     std::cout << "BlockAST {" << endl;  
     std::vector< std::unique_ptr<BaseAST> > &now_vec = *blockitem; 
     HandleSJ(sj+1);
-    std::cout << "ChildNum = " << child_num << endl;
+    std::cout << "BlockNum = " << child_num << endl;
     for (int i=0; i<child_num; i++){
         now_vec[i]->Dump(sj + 1);
         std::cout << "********** End of Child " << i <<endl;
@@ -63,13 +83,15 @@ void StmtAST :: Dump(int sj) const {
     if (sel == 3){
         HandleSJ(sj+1);
         std::cout << "return" << endl;
-        optionalexp->Dump(sj + 1);
+        if (optionalexp != NULL)
+            optionalexp->Dump(sj + 1);
     }
     else if (sel == 2){
         block->Dump(sj + 1);
     }
     else if (sel == 1){
-        optionalexp->Dump(sj + 1);
+        if (optionalexp != NULL)
+            optionalexp->Dump(sj + 1);
     }
     else if (!sel){
         HandleSJ(sj+1);
@@ -218,11 +240,24 @@ void UnaryExpAST :: Dump(int sj) const {
     if (sel == 0){
         pexp->Dump(sj + 1);
     }
-    else{
+    else if (sel == 1){
         HandleSJ(sj + 1);
         std::cout << opt;
         std::cout << ',' << endl;
         unaryexp->Dump(sj + 1);
+    }
+    else{
+        HandleSJ(sj + 1);
+        std::cout << "FuncName = " << ident << std::endl;
+
+        std::vector< std::unique_ptr<BaseAST> > &now_vec = *funcrparam; 
+        HandleSJ(sj+1);
+        std::cout << "Para_Call = " << child_num << endl;
+        for (int i=0; i<child_num; i++){
+            now_vec[i]->Dump(sj + 1);
+            std::cout << "********** End of Child " << i <<endl;
+        }
+        std::cout << endl;
     }
     std::cout << endl;
     HandleSJ(sj);
@@ -338,7 +373,7 @@ void ConstDeclAST :: Dump(int sj) const {
 
     std::vector< std::unique_ptr<BaseAST> > &now_vec = *constdef; 
     HandleSJ(sj+1);
-    std::cout << "ChildNum = " << child_num << endl;
+    std::cout << "ConstDeclNum = " << child_num << endl;
     for (int i=0; i<child_num; i++){
         now_vec[i]->Dump(sj + 1);
         std::cout << "********** End of Child " << i << endl;
@@ -376,7 +411,7 @@ void VarDeclAST :: Dump(int sj) const {
 
     std::vector< std::unique_ptr<BaseAST> > &now_vec = *vardef; 
     HandleSJ(sj+1);
-    std::cout << "ChildNum = " << child_num << endl;
+    std::cout << "VarDeclNum = " << child_num << endl;
     for (int i=0; i<child_num; i++){
         now_vec[i]->Dump(sj + 1);
         std::cout << "********** End of Child " << i <<endl;

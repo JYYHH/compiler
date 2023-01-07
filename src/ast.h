@@ -179,7 +179,12 @@
           - 所以我们只能模拟短路功能，要么是 两个子步骤都可以 PreCompute() 出来 【这预示着必然没有函数调用等有后效性的复杂过程】
             要么是，LOrExp 可以 PreCompute() 出来且为 1，那么我们显然也可以确定 Running 的时候后面的 LAndExp也不会执行，所以可以优化掉
         
-        23. 
+        23. sysy.y 中文，有多有个同一等级并列的情况 (一个Func的 Param, 或者一个 And 表达式的多个组成部分)，
+          均为左递归实现，因为这样可以保证从左到右的顺序
+
+        24. 将函数的 Param 放到了该函数的第一个Block里
+          
+
 */
 
 #define MODE 2 // 2 为关掉优化的模式，1为优化模式
@@ -227,7 +232,8 @@ std::string btype_transfer(std::string &BTYPE);
 
 class CompUnitAST : public BaseAST {
  public:
-  std::unique_ptr<BaseAST> func_def;
+  std::vector< std::unique_ptr<BaseAST> > *func_def;
+  int child_num;
   void Dump(int sj) const override;
   void IRDump() const override;
   void PreCompute() override;
@@ -236,8 +242,18 @@ class CompUnitAST : public BaseAST {
 class FuncDefAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> func_type;
+  std::vector< std::unique_ptr<BaseAST> > *funcfparam;
   std::string ident;
   std::unique_ptr<BaseAST> block;
+  int child_num;
+  void Dump(int sj) const override;
+  void IRDump() const override;
+  void PreCompute() override;
+};
+
+class FuncFParamAST : public BaseAST {
+ public:
+  std::string ident, btype;
   void Dump(int sj) const override;
   void IRDump() const override;
   void PreCompute() override;
@@ -394,8 +410,9 @@ class MulExpAST : public BaseAST {
 class UnaryExpAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> unaryexp, pexp;
-  std::string opt;
-  int sel;
+  std::vector< std::unique_ptr<BaseAST> > *funcrparam;
+  std::string opt, ident;
+  int sel, child_num;
   void Dump(int sj) const override;
   void IRDump() const override;
   void PreCompute() override;

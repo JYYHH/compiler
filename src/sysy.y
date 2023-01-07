@@ -19,6 +19,7 @@ using namespace std;
 
 stack< SymbolTable* > * BaseAST::glbstst = new stack< SymbolTable* >;
 SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
+string glb_funn;
 
 %}
 
@@ -35,7 +36,7 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
   std::vector< std::unique_ptr<BaseAST> > *ast_list; // 用来返回vector指针，vector用来存所有子节点
 }
 %define parse.error verbose
-%token INT RETURN CONST IF ELSE WHILE BREAK CONTINUE
+%token INT RETURN CONST IF ELSE WHILE BREAK CONTINUE VOID
 %token <str_val> IDENT UOP MULOPT RELOPT EQOPT ANDOPT OROPT
 %token <int_val> INT_CONST
 
@@ -52,6 +53,9 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
 // Lv_6 If-else
 %type <ast_val> IfStmt IfElseStmt GLBIf
 // Lv_7 While 直接加在了 Stmt 里
+// Lv_8 Globel Var & Function
+%type <ast_list> CompUnitList FuncFParams FuncRParams FuncFParamsTrue FuncRParamsTrue
+%type <ast_val> FuncFParam
 
 %type <str_val> LVal BType
 %type <int_val> Number
@@ -60,29 +64,83 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
 
 
 CompUnit
-  : FuncDef {
+  : CompUnitList {
     auto comp_unit = make_unique<CompUnitAST>();
-    comp_unit->func_def = unique_ptr<BaseAST>($1);
+    comp_unit->func_def = ($1);
+    comp_unit->child_num = (int)(*(comp_unit->func_def)).size();
     ast = move(comp_unit);
   }
   ;
 
+CompUnitList
+  : FuncDef {
+    auto ret = new std::vector< std::unique_ptr<BaseAST> >;
+    (*ret).push_back( unique_ptr<BaseAST>($1) );
+    $$ = ret;
+  }
+  | CompUnitList FuncDef{
+    auto ret = ($1);
+    (*ret).push_back( unique_ptr<BaseAST>($2) );
+    $$ = ret;
+  }
+  ;
 
 FuncDef
-  : FuncType IDENT '(' ')' Block {
+  : FuncType IDENT '(' FuncFParams ')' Block {
     auto ast = new FuncDefAST();
     ast->func_type = unique_ptr<BaseAST>($1);
     ast->ident = *unique_ptr<string>($2);
-    ast->block = unique_ptr<BaseAST>($5);
+    ast->funcfparam = ($4);
+    ast->child_num = (int)(*(ast->funcfparam)).size();
+    ast->block = unique_ptr<BaseAST>($6);
+
+    // Parsing 时直接把函数名字加到Global符号表里
+    auto INSERT_ITEM = new SymbolTableItem((1 << 5) + (glb_funn == "int") * (1 << 3)); // 把全局函数名称加到符号表里
+    BaseAST::glbsymbtl->Insert(ast->ident, *INSERT_ITEM);
     $$ = ast;
   }
   ;
 
+FuncFParams
+  : {
+    $$ = new std::vector< std::unique_ptr<BaseAST> >;
+  }
+  | FuncFParamsTrue {
+    $$ = ($1);
+  }
+  ;
+
+FuncFParamsTrue
+  : FuncFParam {
+    auto ret = new std::vector< std::unique_ptr<BaseAST> >;
+    (*ret).push_back( unique_ptr<BaseAST>($1) );
+    $$ = ret;
+  }
+  | FuncFParamsTrue ',' FuncFParam {
+    auto ret = ($1);
+    (*ret).push_back( unique_ptr<BaseAST>($3) );
+    $$ = ret;
+  }
+  ;
+
+FuncFParam
+  : BType IDENT {
+      auto ast = new FuncFParamAST();
+      ast->btype = *unique_ptr<string>($1);
+      ast->ident = *unique_ptr<string>($2);
+      $$ = ast;
+  }
+  ;
 
 FuncType
   : INT {
     auto ast = new FuncTypeAST();
-    ast->type = "int";
+    glb_funn = ast->type = "int";
+    $$ = ast;
+  }
+  | VOID {
+    auto ast = new FuncTypeAST();
+    glb_funn = ast->type = "void";
     $$ = ast;
   }
   ;
@@ -334,6 +392,36 @@ UnaryExp
     ast->opt = *unique_ptr<string>($1);
     ast->unaryexp = unique_ptr<BaseAST>($2);
     $$ = ast;
+  }
+  | IDENT '(' FuncRParams ')' {
+    auto ast = new UnaryExpAST();
+    ast->sel = 2;
+    ast->ident = *unique_ptr<string>($1);
+    ast->funcrparam = ($3);
+    ast->child_num = (int)(*(ast->funcrparam)).size();
+    $$ = ast;
+  }
+  ;
+
+FuncRParams
+  : {
+    $$ = new std::vector< std::unique_ptr<BaseAST> >;
+  }
+  | FuncRParamsTrue {
+    $$ = ($1);
+  }
+  ;
+
+FuncRParamsTrue
+  : Exp {
+    auto ret = new std::vector< std::unique_ptr<BaseAST> >;
+    (*ret).push_back( unique_ptr<BaseAST>($1) );
+    $$ = ret;
+  }
+  | FuncRParamsTrue ',' Exp {
+    auto ret = ($1);
+    (*ret).push_back( unique_ptr<BaseAST>($3) );
+    $$ = ret;
   }
   ;
 

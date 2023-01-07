@@ -13,8 +13,13 @@
 class SymbolTableItem {
  public:
     int sel; 
-    // Last Bit of 'sel' : 0 -> const / 1 -> var ; 
+    // Last Bit of 'sel' : 0 -> const / 1 -> var (或者其他能变的东西) ; 
     // First Bit of 'sel' : 0 -> unvalued before / 1 -> has been valued 
+    // special sel : 
+        // 32 -> func without return value
+        // 40 -> func with return value
+        // 65 -> func_param
+
     int val; // value
     
     SymbolTableItem(int SEL) : sel(SEL),val(1 << 31){}

@@ -5,9 +5,7 @@
 
 /*
     Note for IR Generating:
-        1. Func_Ret, 遇到多个 Return 的时候只会返回第一个，且如果没有 Return 也会返回一个 Return
-            待修理
-        2. 用了一个比较精巧的结构 (int var_num, is_01; int var_ins[300005];)
+        1.. 用了一个比较精巧的结构 (int var_num, is_01; int var_ins[300005];)
             -> 同时存 Koopa 中出现的常量 和 变量
     
     Note for DS using:
@@ -37,6 +35,9 @@ stack< Pr > blk_info;
 #define TOP blk_info.top()
 
 string now_btype;
+string now_type;
+string funcparam_name_ir;
+string funcparam_btype;
 int BLKID, ID_instr, Func_Ret;
 int If_num = 0, While_NUM = 0;
 int OR_num = 0, AND_num = 0;
@@ -90,24 +91,56 @@ inline int BaseAST :: PreComputeProcedure() const{
 
 void CompUnitAST :: IRDump() const{
     push_into_tbl_stk(glbsymbtl, 0);
-    func_def->IRDump();
+    std::vector< std::unique_ptr<BaseAST> > &now_vec = *func_def;
+    for (int i=0; i<child_num; i++)
+        now_vec[i]->IRDump();
     pop_tbl_stk();
 }
 void FuncDefAST :: IRDump() const {
+    var_num = 0; // 局部临时变量可以重用
+
     std::cout << "fun @";
-    std::cout << ident << "(): ";
+    std::cout << ident << '(';
+
+    std::vector< std::unique_ptr<BaseAST> > &now_vec = *funcfparam; 
+    for (int i=0; i<child_num; i++){
+        if (i) std::cout << ", ";
+        now_vec[i]->IRDump();
+        std::cout << '@' << funcparam_name_ir << ": " << funcparam_btype;
+    }
+
+    std::cout << ')';
     func_type->IRDump();
 
-    std::cout << " {" << endl;
+    std::cout << "{" << endl;
     std::cout << " %" << "entry:" << endl;
-    Func_Ret = 0;
+    
+    for (int i=0; i<child_num; i++){
+        now_vec[i]->IRDump();
+        cout << "    %" << funcparam_name_ir << " = alloc i32" << endl;
+        cout << "    store @" << funcparam_name_ir << ", %" << funcparam_name_ir << endl;
+        // 但如果后续在函数中修改了函数 Param 可能会寄掉
+    }
+
     block->IRDump();
-    std::cout << "    ret 0" << endl; // 愿称你为托底天王
+    if (now_type == "int")
+        std::cout << "    ret 0" << endl; // 愿称你为托底天王
+    else if (now_type == "void")
+        std::cout << "    ret" << endl; // 愿称你为托底天王
     std::cout << "}" << endl;
+}
+void FuncFParamAST :: IRDump() const {
+    funcparam_name_ir = ident;
+    if (btype == "int")
+        funcparam_btype = "i32";
+    else 
+        funcparam_btype = "Please Check your Func Param Btype";
 }
 void FuncTypeAST :: IRDump() const {
     if (type == "int")
-        std::cout << "i32";
+        std::cout << ": i32 ", now_type = "int";
+    else 
+        std::cout << ' ', now_type = "void";
 }
 void BlockAST :: IRDump() const {
     push_into_tbl_stk(symbtl, 1);
@@ -146,14 +179,23 @@ void StmtAST :: IRDump() const {
         Func_Ret ++;
         // if (Func_Ret > 1) return;
 
-        if (can_compute == MODE)
-            std::cout << "    ret " << val << endl;
+        if (now_type == "int"){
+            if (optionalexp == NULL)
+                exit(9);
+            if (can_compute == MODE)
+                std::cout << "    ret " << val << endl;
+            else{
+                optionalexp->IRDump();
+                if(is_01 >> 1)
+                    std::cout << "    ret " << var_ins[var_num - 1] << endl;
+                else
+                    std::cout << "    ret %" << var_num - 1 << endl;
+            }
+        }
         else{
-            optionalexp->IRDump();
-            if(is_01 >> 1)
-                std::cout << "    ret " << var_ins[var_num - 1] << endl;
-            else
-                std::cout << "    ret %" << var_num - 1 << endl;
+            if (optionalexp != NULL)
+                exit(10);
+            std::cout << "    ret" << endl;
         }
 
         std::cout << " %" << "after_ret_" << Func_Ret << ':' << endl;
@@ -161,20 +203,33 @@ void StmtAST :: IRDump() const {
     else if (sel == 0){
         if (can_compute == MODE){
             string alter_one = lval;
-            std::cout << "    store " << val << ", @" << lval_belong->ST_name << '_' << lval << endl;
+            auto ret = lval_belong->GetItemByName(alter_one);
+            if (ret->VarType() & 64)
+                std::cout << "    store " << val << ", %" << lval << endl;
+            else
+                std::cout << "    store " << val << ", @" << lval_belong->ST_name << '_' << lval << endl;
             return;
         }
 
         exp->IRDump();
-        // store %1, @x
+
         string alter_one = lval;
+        auto ret = lval_belong->GetItemByName(alter_one);
+
         if(is_01 >> 1)
-            std::cout << "    store " << var_ins[var_num - 1] << ", @" << lval_belong->ST_name << '_' << lval << endl;
+            if (ret->VarType() & 64)
+                std::cout << "    store " << var_ins[var_num - 1] << ", %" << lval << endl;
+            else
+                std::cout << "    store " << var_ins[var_num - 1] << ", @" << lval_belong->ST_name << '_' << lval << endl;
         else
-            std::cout << "    store %" << var_num - 1 << ", @" << lval_belong->ST_name << '_' << lval << endl;
+            if (ret->VarType() & 64)
+                std::cout << "    store %" << var_num - 1 << ", %" << lval << endl;
+            else
+                std::cout << "    store %" << var_num - 1 << ", @" << lval_belong->ST_name << '_' << lval << endl;
     }
     else if (sel == 1){
-        // 这种情况甚至不用 generate code
+        if (can_compute == 0)
+            optionalexp->IRDump();
     }
     else if (sel == 2)
         block->IRDump();
@@ -394,7 +449,7 @@ void UnaryExpAST :: IRDump() const {
 
     if (sel == 0)
         pexp->IRDump();
-    else{
+    else if (sel == 1) {
         unaryexp->IRDump();
         if(opt[0] == '-'){
             if(is_01 >> 1)
@@ -411,6 +466,40 @@ void UnaryExpAST :: IRDump() const {
             var_num ++, is_01 = 1;
         }
     }
+    else{
+        // 我们进行函数调用
+        std::vector< std::unique_ptr<BaseAST> > &now_vec = *funcrparam; 
+        std::vector< Pr > *now_exp = new std::vector< Pr >;
+
+        for (int i=0; i<child_num; i++){
+            now_vec[i]->IRDump();
+            (*now_exp).push_back(Pr(var_num - 1, is_01));
+            // cout << var_num - 1 << ' ' << is_01 << ' ' << var_ins[var_num - 1] << endl;
+        }
+
+        string tttemp = ident;
+        auto ret = BaseAST::glbsymbtl->GetItemByName(tttemp);
+        if (ret == NULL)
+            exit(11);
+        if (ret->VarType() & 8){
+            cout << "    %" << var_num << " = call @" << ident << '(';
+            var_num ++, is_01 = 0;
+        }
+        else
+            cout << "    call @" << ident << '(';
+        
+        for (int i=0; i<child_num; i++){
+            if (i)
+                cout << ", ";
+            Pr &now_pr = (*now_exp)[i];
+            if (now_pr.second >> 1)
+                cout << var_ins[now_pr.first];
+            else
+                cout << '%' << now_pr.first;
+        }
+
+        cout << ')' << endl;
+    }   
 }
 void PrimaryExpAST :: IRDump() const {
     if (PreComputeProcedure()) return;
@@ -426,7 +515,10 @@ void PrimaryExpAST :: IRDump() const {
             alr_compute_procedure(ret->VarVal());
             return;
         }
-        std::cout << "    %" << var_num << " = load @" << lval_belong->ST_name << '_' << lval << endl;
+        if (ret->VarType() & 64)
+            std::cout << "    %" << var_num << " = load %" << lval << endl;
+        else
+            std::cout << "    %" << var_num << " = load @" << lval_belong->ST_name << '_' << lval << endl;
         var_num ++, is_01 = 0;
     }
     else 

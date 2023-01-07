@@ -1,3 +1,15 @@
+/*
+    待实现优化：
+        1. while 内的优化 (maybe no solution)
+        2. 全局变量的优化 (maybe no solution)
+        3. 函数参数调用的优化 (maybe no solution)
+        4. 赋值 和 引用语句的, LCA的优化
+
+    可能存在的隐患：
+        1. 不确定如果在函数内部对 Param 进行修改会有什么后效性 (虽然确实可以这样做)
+        
+*/
+
 #include <string>
 #include <memory>
 #include <iostream>
@@ -7,6 +19,9 @@ using namespace std;
 
 int total_blk_num = 0;
 int bin_precompute_for_var = 0; // 用来在 while(exp) 中关闭 exp 对于变量Var 依赖的提前计算功能
+// 用来预处理函数的第一个 Block 开头需要的信息
+string funcparam_name; // 全局的temp变量，用来维护扫描到的 Param 的名字
+std::vector< std::unique_ptr<BaseAST> > *glb_funcfparam;
 
 inline void BaseAST :: PreComputeAssign(std::unique_ptr<BaseAST> &child){
     if (child->can_compute == 1){
@@ -19,11 +34,13 @@ inline void BaseAST :: PreComputeAssign(std::unique_ptr<BaseAST> &child){
 }
 
 void CompUnitAST :: PreCompute(){
-    glbsymbtl->ST_name = "GLOBAL_Table";
+    BaseAST::glbsymbtl->ST_name = "GLOBAL_Table";
     BaseAST::glbsymbtl->reach_st.push(1); // 全局 Block, 我们也假设必然可达
     push_into_tbl_stk(glbsymbtl, 0); // 全局变量进入
     
-    func_def->PreCompute();
+    std::vector< std::unique_ptr<BaseAST> > &now_vec = *func_def; 
+    for (int i=0; i<child_num; i++)
+        now_vec[i]->PreCompute();
 
     pop_tbl_stk(); // 全局变量表退出
     BaseAST::glbsymbtl->reach_st.pop();
@@ -31,7 +48,12 @@ void CompUnitAST :: PreCompute(){
 
 void FuncDefAST :: PreCompute(){
     func_type->PreCompute();
+    glb_funcfparam = funcfparam;
     block->PreCompute();
+}
+
+void FuncFParamAST :: PreCompute(){
+    funcparam_name = ident;
 }
 
 void FuncTypeAST :: PreCompute(){
@@ -45,6 +67,18 @@ void BlockAST :: PreCompute(){
     symbtl->ST_name = "block_" + to_string(total_blk_num);
     symbtl->reach_st.push(1); // 每一块的入口，我们初始化为1，表示必然可达
     push_into_tbl_stk(symbtl, 1); // 这个 Block 的符号表进入
+
+    if (glb_funcfparam != NULL){
+        std::vector< std::unique_ptr<BaseAST> > &now_vec = *glb_funcfparam; 
+        int BOUND = now_vec.size();
+        for (int i=0; i<BOUND; i++){
+            now_vec[i]->PreCompute();
+            auto FUNCPARAM = new SymbolTableItem((1 << 6) | 1);
+            present_tbl()->Insert(funcparam_name, *FUNCPARAM);
+        }
+
+        glb_funcfparam = NULL;
+    }
 
     std::vector< std::unique_ptr<BaseAST> > &now_vec = *blockitem; 
     for (int i=0;i<child_num;i++)
@@ -102,13 +136,12 @@ void IfElseStmtAST :: PreCompute(){
 }
 
 void StmtAST :: PreCompute(){
-    if (sel == 3){
-        optionalexp->PreCompute();
-        PreComputeAssign(optionalexp);
-    }
-    else if (sel == 1){
-        // 不用递归，因为子树的结果我们完全用不到
-        can_compute = 0; // useless
+    if (sel == 3 || sel == 1){
+        if (optionalexp != NULL){
+            optionalexp->PreCompute();
+            PreComputeAssign(optionalexp);
+        }
+        else can_compute = 1;
     }
     else if (sel == 2){
         block->PreCompute();
@@ -307,7 +340,7 @@ void UnaryExpAST :: PreCompute(){
         pexp->PreCompute();
         PreComputeAssign(pexp);
     }
-    else{
+    else if (sel == 1){
         unaryexp->PreCompute();
 
         can_compute = unaryexp->can_compute;
@@ -319,6 +352,14 @@ void UnaryExpAST :: PreCompute(){
             else 
                 val = unaryexp->val;
         }
+    }
+    else{
+        std::vector< std::unique_ptr<BaseAST> > &now_vec = *funcrparam; 
+        for (int i=0;i<child_num;i++)
+            now_vec[i]->PreCompute();
+
+        can_compute = 0;
+        val = 1 << 31;
     }
 }
 
@@ -340,8 +381,9 @@ void PrimaryExpAST :: PreCompute(){
         if (ret == NULL)
             exit(4);
         
-        can_compute = (ret->VarType() >> 1) & (1 ^ ((bin_precompute_for_var!=0) & ret->VarType() & 1));
-        // 如果我们暂时关了 precompute功能，且要用的是 Var，那么这个 PrimaryExp 也是不能优化的
+        can_compute = (ret->VarType() >> 1) & (1 ^ ((bin_precompute_for_var != 0) & ret->VarType())) & (lval_belong != BaseAST::glbsymbtl);
+        // 如果我们暂时关了 precompute功能 (主要可能是因为While循环) ，且要用的是 Var，那么这个 PrimaryExp 也是不能优化的
+        // 同时 全局变量 (在最后一个判断里) && 函数参数(VarType = (1 << 6) | 1) 也不能优化
         val = ret->VarVal();
     }
 }
