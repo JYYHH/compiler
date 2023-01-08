@@ -50,8 +50,7 @@ int main(int argc, const char *argv[]) { // compiler 模式 输入文件 -o 输�
     int lenIR = 0;
 
     while(IRstream.get(ch))
-      if(ch != '\n')
-        IR[lenIR++] = ch;
+      IR[lenIR++] = ch;
     IR[lenIR] = '\0';
 
     IRstream.close(); // 关闭对IR的读入流

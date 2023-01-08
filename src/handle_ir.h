@@ -18,11 +18,17 @@
             (2) 同样的，我们发现 koopa_raw_load_t 的地址其实就是它所属的koopa_raw_value_data地址加上一个常数
                 偏移
             (3) 同理，koopa_raw_binary_t 也是如此，而且它们的偏移量甚至都一样。。。。
+
+        8. 关于函数调用：
+            8.1 : 由于目前没有需要保存的Callee Reg （除了 ra），所以这一部分还没有实现
+            8.2 : 虽然 Caller Reg 确实需要保存了，但由于我们现在的写法把 Param 在函数开头就存到栈上了，
+                只有一个 t4 需要保存 （我设计的用来存每个函数的额外参数在栈上起始位置的参数）
 */
 
 #pragma once
 
 #include "koopa.h"
+#include "ast.h"
 
 // Basic Visit Function (Walk Through Koopa Tree in a recursion type)
 void Visit(const koopa_raw_program_t &program, const int mode);
@@ -38,6 +44,8 @@ void Visit(const koopa_raw_load_t &LoadOP, const int mode);
 void Visit(const koopa_raw_store_t &StoreOP, const int mode);
 void Visit(const koopa_raw_branch_t &Branch, const int mode);
 void Visit(const koopa_raw_jump_t &Jump, const int mode);
+void Give_param2Callee(const koopa_raw_slice_t &slice); // 处理函数调用
+void Visit(const koopa_raw_call_t &Call, const int mode);
 
 
 

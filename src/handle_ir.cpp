@@ -17,7 +17,7 @@ using namespace std;
 
 // --------------------------- MainTain the RISC-V Stack -----------------------
 const unsigned int Mask_16 = (~0u) << 4;
-unsigned int need_size_on_stack, stack_size;
+unsigned int need_size_on_stack, stack_size, call_param_size;
 inline void ClearStack(){ need_size_on_stack = 0;}
 inline void GrowStack(const unsigned int x){ need_size_on_stack += x;}
 inline unsigned int GetStackSize(){ return need_size_on_stack; }
@@ -25,86 +25,133 @@ inline void AlignStackSize(unsigned int &x){ x = (x + (~Mask_16)) & Mask_16;}
 unordered_map<koopa_raw_binary_t* , unsigned int> mmp; // bin_instr -> offset
 unordered_map<koopa_raw_load_t* , unsigned int> ldmmp; // load_instr (等号左边的百分号) -> offset
 unordered_map<koopa_raw_value_t, unsigned int> allcmmp; // local alloc -> offset
+unordered_map<koopa_raw_call_t*, unsigned int> callmmp; // call_instr -> offset
+string now_func_name_risc;
+static string param_reg_name[8] = {
+  "a0",
+  "a1",
+  "a2",
+  "a3",
+  "a4",
+  "a5",
+  "a6",
+  "a7"
+};
 
 // 将栈空间某偏移量的数据 load 到指定寄存器中
-inline void Offset2Register(unsigned int &OFFSET, string reg_name){
+inline void Offset2Register(unsigned int &OFFSET, string reg_name, string init_stack_p = "sp"){
   if (OFFSET < (1<<11)){
-    cout << risc_lw("sp", reg_name, OFFSET);
+    cout << risc_lw(init_stack_p, reg_name, OFFSET);
   }
   else{
     cout << risc_li("t1", OFFSET);
-    cout << risc_add("t1", "t1", "sp");
+    cout << risc_add("t1", "t1", init_stack_p);
     cout << risc_lw("t1", reg_name, 0);
   }
 }
 // 前身是 Binary2Register ： 将某条二进制指令的结果load到指定寄存器中
-inline void Binary2Register(koopa_raw_binary_t* addr, string reg_name){
+inline void Binary2Register(koopa_raw_binary_t* addr, string reg_name, string init_stack_p = "sp"){
   unsigned int offset = mmp[addr];
-  Offset2Register(offset, reg_name);
+  Offset2Register(offset, reg_name, init_stack_p);
 }
 
-inline void Load2Register(koopa_raw_load_t* addr, string reg_name){
+inline void Load2Register(koopa_raw_load_t* addr, string reg_name, string init_stack_p = "sp"){
   unsigned int offset = ldmmp[addr];
-  Offset2Register(offset, reg_name);
+  Offset2Register(offset, reg_name, init_stack_p);
 }
 
-inline void Alloc2Register(koopa_raw_value_t addr, string reg_name){
+inline void Alloc2Register(koopa_raw_value_t addr, string reg_name, string init_stack_p = "sp"){
   unsigned int offset = allcmmp[addr];
-  Offset2Register(offset, reg_name);
+  Offset2Register(offset, reg_name, init_stack_p);
+}
+
+inline void Call2Register(koopa_raw_call_t* addr, string reg_name, string init_stack_p = "sp"){
+  unsigned int offset = callmmp[addr];
+  Offset2Register(offset, reg_name, init_stack_p);
 }
 
 // From an Instr to the Register
-inline void Instr2Register(const koopa_raw_value_t& addr, string reg_name){
+inline void Instr2Register(const koopa_raw_value_t& addr, string reg_name, string init_stack_p = "sp"){
+  if (addr == NULL) // void
+    return;
+
+  int reg_rank;
   switch (addr->kind.tag) {
     case KOOPA_RVT_INTEGER :
       cout << risc_li(reg_name, addr->kind.data.integer.value) ;
       break;
     case KOOPA_RVT_BINARY :
-      Binary2Register((koopa_raw_binary_t* )&(addr->kind.data.binary), reg_name);
+      Binary2Register((koopa_raw_binary_t* )&(addr->kind.data.binary), reg_name, init_stack_p);
       break;
     case KOOPA_RVT_LOAD :
       // Load 的 result 放到 Reg 上
-      Load2Register((koopa_raw_load_t* )&(addr->kind.data.load), reg_name);
+      Load2Register((koopa_raw_load_t* )&(addr->kind.data.load), reg_name, init_stack_p);
       break;
     case KOOPA_RVT_ALLOC :
       // 这个对应的局部变量的结果放到 Reg 上
-      Alloc2Register((koopa_raw_value_t)(addr), reg_name);
+      Alloc2Register((koopa_raw_value_t)(addr), reg_name, init_stack_p);
+      break;
+    case KOOPA_RVT_CALL:
+      Call2Register((koopa_raw_call_t* )&(addr->kind.data.call), reg_name, init_stack_p);
+      break;
+    case KOOPA_RVT_FUNC_ARG_REF:
+      reg_rank = addr->kind.data.func_arg_ref.index;
+      if (reg_rank < 8){
+        cout << risc_mv(reg_name, param_reg_name[reg_rank]);
+      }
+      else{
+        // use t4 to find out, where the param is
+        int OffSet = 4 * (reg_rank - 8); // 别忘了每个单位是 4 bytes
+        if (OffSet < (1<<11)){
+          cout << risc_lw("t4", reg_name, OffSet);
+        }
+        else{
+          cout << risc_li("t1", OffSet);
+          cout << risc_add("t1", "t1", "t4");
+          cout << risc_lw("t1", reg_name, 0);
+        }
+      }
       break;
     default:
       assert(false);
   }
 }
 
-inline void Register2Stack(unsigned int &OFFSET, string reg_name){
+inline void Register2Stack(unsigned int &OFFSET, string reg_name, string init_stack_p = "sp"){
   // int IMM = GetStackSize();
   if (reg_name == "t1")
     exit(7);
   if (OFFSET < (1<<11)){
-    cout << risc_sw("sp", reg_name, OFFSET);
+    cout << risc_sw(init_stack_p, reg_name, OFFSET);
   }
   else{
     cout << risc_li("t1", OFFSET);
-    cout << risc_add("t1", "t1", "sp");
+    cout << risc_add("t1", "t1", init_stack_p);
     cout << risc_sw("t1", reg_name, 0);
   }
 }
 
-inline void Register2Binary(koopa_raw_binary_t* addr, string reg_name){
+inline void Register2Binary(koopa_raw_binary_t* addr, string reg_name, string init_stack_p = "sp"){
   unsigned int offset = mmp[addr];
-  Register2Stack(offset, reg_name);
+  Register2Stack(offset, reg_name, init_stack_p);
 }
 
-inline void Register2Load(koopa_raw_load_t* addr, string reg_name){
+inline void Register2Load(koopa_raw_load_t* addr, string reg_name, string init_stack_p = "sp"){
   unsigned int offset = ldmmp[addr];
-  Register2Stack(offset, reg_name);
+  Register2Stack(offset, reg_name, init_stack_p);
 }
 
-inline void Register2Alloc(koopa_raw_value_t addr, string reg_name){
+inline void Register2Alloc(koopa_raw_value_t addr, string reg_name, string init_stack_p = "sp"){
   unsigned int offset = allcmmp[addr];
-  Register2Stack(offset, reg_name);
+  Register2Stack(offset, reg_name, init_stack_p);
 }
 
-inline void Register2Instr(const koopa_raw_value_t& addr, string reg_name){
+inline void Register2Call(koopa_raw_call_t* addr, string reg_name, string init_stack_p = "sp"){
+  unsigned int offset = callmmp[addr];
+  Register2Stack(offset, reg_name, init_stack_p);
+}
+
+inline void Register2Instr(const koopa_raw_value_t& addr, string reg_name, string init_stack_p = "sp"){
   switch (addr->kind.tag) {
     case KOOPA_RVT_INTEGER :
       assert(false);
@@ -117,7 +164,7 @@ inline void Register2Instr(const koopa_raw_value_t& addr, string reg_name){
       break;
     case KOOPA_RVT_ALLOC :
       // 将 Reg 的值传到这个局部变量在栈上的位置
-      Register2Alloc((koopa_raw_value_t)(addr), reg_name);
+      Register2Alloc((koopa_raw_value_t)(addr), reg_name, init_stack_p);
       break;
     default:
       assert(false);
@@ -125,6 +172,22 @@ inline void Register2Instr(const koopa_raw_value_t& addr, string reg_name){
 }
 
 inline void pre_func(){
+  auto ret = BaseAST::glbsymbtl->GetItemByName(now_func_name_risc);
+  if (ret->VarType() & 16){
+    GrowStack(4);
+    cout << risc_sw("sp","ra",-4);
+  }
+
+  /*
+    注：由于目前没有需要保存的 Callee Reg，所以这一部分不需要保存和 (after_func) 恢复 Callee Reg
+  */
+
+  stack_size = need_size_on_stack; // 存在 stack_size 里
+  AlignStackSize(stack_size);
+  ClearStack();
+
+  if (stack_size == 0) return;
+
   if (stack_size <= (1<<11)){
     cout << risc_addi("sp", "sp", -((int)stack_size));
   }
@@ -135,6 +198,9 @@ inline void pre_func(){
 }
 
 inline void after_func(){
+  auto ret = BaseAST::glbsymbtl->GetItemByName(now_func_name_risc);
+  if (stack_size == 0) return;
+
   if (stack_size < (1<<11)){
     cout << risc_addi("sp", "sp", stack_size);
   }
@@ -142,6 +208,9 @@ inline void after_func(){
     cout << risc_li("t1", stack_size);
     cout << risc_add("sp", "t1", "sp");
   }
+
+  if (ret->VarType() & 16) 
+    cout << risc_lw("sp", "ra", -4);
 }
 
 // Basic Functions
@@ -214,14 +283,12 @@ inline void binary2risc(koopa_raw_binary_op_t optype, string o1, string o2){
 }
 
 
-
-
 // ------------------------ Basic Visit ------------------------------------------------------
 
 void Visit(const koopa_raw_program_t &program, const int mode){
   // 执行一些其他的必要操作
   // ...
-  // 访问所有全局变量
+  // 
   if (program.values.len > 0 && !(mode))
     printf("   .data\n");
   Visit(program.values, mode);
@@ -256,26 +323,34 @@ void Visit(const koopa_raw_slice_t &slice, const int mode) {
 }
 // 访问函数
 void Visit(const koopa_raw_function_t &func, const int mode) {
-  // 执行一些其他的必要操作
-  ClearStack();
-  Visit(func->bbs, 1); // 预计算出需要的栈空间
-  stack_size = need_size_on_stack; // 存在 stack_size 里
-  AlignStackSize(stack_size);
-  ClearStack();
+  now_func_name_risc = string(func->name + 1);
 
+  if (now_func_name_risc == "getint" || now_func_name_risc == "getch" || now_func_name_risc == "getarray" || now_func_name_risc == "putint" ||now_func_name_risc == "putch" ||now_func_name_risc == "putarray" || now_func_name_risc == "starttime" ||now_func_name_risc == "stoptime")
+    return;
+
+  // 执行一些其他的必要操作
   if(func->name && !(mode)) 
     printf("%s:\n", func->name + 1);
-  // 访问所有基本块
+  ClearStack();
+  Visit(func->bbs, 1); // 预计算出需要的栈空间
   pre_func();
+  
+  // 访问所有基本块
   Visit(func->bbs, mode);
-  // 怎么解决，在 ret 前把栈帧减回来的问题，目前先lazy 处理了。。。
+  // Solved
+  cout << "Func_" << now_func_name_risc << "_Ret:" << endl;
+  after_func(); // can be right at least now
+  cout << "   ret" <<endl;
 }
 // 访问基本块
 void Visit(const koopa_raw_basic_block_t &bb, const int mode) {
+  // cout << string(bb->name + 1) << ' ' << bb->insts.len << endl;
   // 执行一些其他的必要操作
-  if(bb->name && !(mode))
-    printf(" %s:\n", bb->name + 1);
+  // if(bb->name && !(mode))
+  //   printf(" %s:\n", bb->name + 1);
   // 访问所有指令
+  if(bb->name && !(mode))
+    cout << now_func_name_risc << '_' << string(bb->name + 1) << ':' << endl;
   Visit(bb->insts, mode);
 }
 
@@ -303,6 +378,9 @@ void Visit(const koopa_raw_value_t &value, const int mode) {
     // 所以我们进入这条指令之后没有任何必要再次递归到这个地方
   // 根据指令类型判断后续需要如何访问
   const auto &kind = value->kind;
+  string tttmmpp;
+  SymbolTableItem* ret;
+
   switch (kind.tag) {
     case KOOPA_RVT_RETURN:
       // 访问 return 指令
@@ -359,6 +437,23 @@ void Visit(const koopa_raw_value_t &value, const int mode) {
       if (!mode)
         Visit(kind.data.jump, mode);
       break;
+    case KOOPA_RVT_CALL:
+      tttmmpp = string(kind.data.call.callee->name + 1);
+      ret = BaseAST::glbsymbtl->GetItemByName(tttmmpp);
+      // 判断调用的函数是不是有返回值，决定要不要开一个 local var 存它
+      if (ret->VarType() & 8){
+        if (!mode)
+          Visit(kind.data.call, 1);
+        else 
+          GrowStack(4);
+      }
+      else
+        if (!mode)
+          Visit(kind.data.call, 0);
+      break;
+    case KOOPA_RVT_FUNC_ARG_REF :
+      // do nothing, we can tackle this in the section of 
+      break;
     default:
       break;
       // 其他类型暂时遇不到
@@ -370,10 +465,9 @@ void Visit(const koopa_raw_value_t &value, const int mode) {
 // ------------------------ `koopa_raw_value_t` Visit ------------------------------------------------------
 
 void Visit(const koopa_raw_return_t &ret, const int mode){
+  // cout << "here" << ' ' << ret.value->kind.tag << endl;
   Instr2Register(ret.value, "a0");
-
-  after_func(); // can be right at least now
-  cout << "   ret" <<endl;
+  cout << risc_j("Func_" + now_func_name_risc + "_Ret");
 }
 
 void Visit(const koopa_raw_integer_t &INT, const int mode){
@@ -389,8 +483,6 @@ void Visit(const koopa_raw_binary_t &BinOP, const int mode){
 
   binary2risc(BinOP.op, "t1", "t2");
   // out_come is in 't2'
-
-
   Register2Binary((koopa_raw_binary_t* )(&BinOP), "t2");
   // put the result on the stack
 
@@ -421,14 +513,76 @@ void Visit(const koopa_raw_branch_t &Branch, const int mode){
   // cout << Branch.true_bb->name << endl;
   // ...
   Instr2Register(Branch.cond, "t2");
-  cout << risc_bnez("t2", Branch.true_bb->name + 1);
-  cout << risc_j(Branch.false_bb->name + 1);
+  cout << risc_bnez("t2", now_func_name_risc + string("_") + string(Branch.true_bb->name + 1));
+  cout << risc_j(now_func_name_risc + string("_") + string(Branch.false_bb->name + 1));
 }
 
 void Visit(const koopa_raw_jump_t &Jump, const int mode){
-  cout << risc_j(Jump.target->name + 1);
+  cout << risc_j(now_func_name_risc + string("_") + string(Jump.target->name + 1));
 }
 
+inline int down_8(int x){
+  return x >= 8 ? x-8 : 0;
+}
+
+void Give_param2Callee(const koopa_raw_slice_t &slice){
+  call_param_size = 4;
+
+  cout << risc_sw("sp", "t4", -4); // t4 maintain the beginning of present more Param
+
+  call_param_size += 4 * down_8(slice.len);
+  AlignStackSize(call_param_size);
+
+  if (call_param_size <= (1<<11)){
+    cout << risc_addi("t4", "sp", -((int)call_param_size));
+  }
+  else{
+    cout << risc_li("t1", -((int)call_param_size));
+    cout << risc_add("t4", "t1", "sp");
+  }
+
+  for (size_t i = 0; i < slice.len; ++i) {
+    auto ptr = slice.buffer[i];
+    auto now_value = reinterpret_cast<koopa_raw_value_t>(ptr);
+    Instr2Register(now_value, "t2");
+    
+    if (i <= 7){
+      // 前面八个参数搞到 Reg 里
+      cout << risc_mv(param_reg_name[i], "t2");
+      continue;
+    }
+
+    unsigned int nn_offset = 4 * (i - 8);
+    Register2Stack(nn_offset, "t2", "t4");
+    // 于是我们存好了所有额外的参数
+  }
+
+  cout << risc_mv("sp", "t4");
+}
+
+void Visit(const koopa_raw_call_t &Call, const int mode){
+  if (mode) 
+    callmmp[(koopa_raw_call_t* )(&Call)] = GetStackSize();
+
+  Give_param2Callee(Call.args);
+
+  cout << risc_call(Call.callee->name + 1);
+
+  if (call_param_size < (1<<11)){
+    cout << risc_addi("sp", "sp", call_param_size);
+  }
+  else{
+    cout << risc_li("t1", call_param_size);
+    cout << risc_add("sp", "t1", "sp");
+  }
+
+  cout << risc_lw("sp", "t4", -4); // recover the t4 register
+  
+  if (mode){
+    Register2Call((koopa_raw_call_t* )(&Call), "a0"); // 返回值在 a0 里，如果有的话
+    GrowStack(4);
+  }
+}
 
 int handle_str_ir(const char *str){
   koopa_program_t program;
