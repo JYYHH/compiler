@@ -27,6 +27,7 @@ unordered_map<koopa_raw_load_t* , unsigned int> ldmmp; // load_instr (等号左�
 unordered_map<koopa_raw_value_t, unsigned int> allcmmp; // local alloc -> offset
 unordered_map<koopa_raw_call_t*, unsigned int> callmmp; // call_instr -> offset
 string now_func_name_risc;
+int if_define_stage;
 static string param_reg_name[8] = {
   "a0",
   "a1",
@@ -112,6 +113,10 @@ inline void Instr2Register(const koopa_raw_value_t& addr, string reg_name, strin
         }
       }
       break;
+    case KOOPA_RVT_GLOBAL_ALLOC :
+      cout << risc_la("t1", addr->name + 1);
+      cout << risc_lw("t1", reg_name, 0);
+      break;
     default:
       assert(false);
   }
@@ -165,6 +170,11 @@ inline void Register2Instr(const koopa_raw_value_t& addr, string reg_name, strin
     case KOOPA_RVT_ALLOC :
       // 将 Reg 的值传到这个局部变量在栈上的位置
       Register2Alloc((koopa_raw_value_t)(addr), reg_name, init_stack_p);
+      break;
+    case KOOPA_RVT_GLOBAL_ALLOC :
+      // 将 Reg 的值传到全局变量在DATA段的位置
+      cout << risc_la("t1", addr->name + 1);
+      cout << risc_sw("t1", reg_name, 0);
       break;
     default:
       assert(false);
@@ -282,6 +292,17 @@ inline void binary2risc(koopa_raw_binary_op_t optype, string o1, string o2){
   }  
 }
 
+string Global_name;
+
+inline void Define(const koopa_raw_global_alloc_t &global_alloc){
+  cout << "   .global " << Global_name << endl;
+  cout << Global_name << ':' << endl;
+  if (global_alloc.init->kind.tag == KOOPA_RVT_INTEGER)
+    cout << "   .word " << global_alloc.init->kind.data.integer.value << endl;
+  else
+    cout << "   .zero 4" << endl;
+}
+
 
 // ------------------------ Basic Visit ------------------------------------------------------
 
@@ -289,10 +310,15 @@ void Visit(const koopa_raw_program_t &program, const int mode){
   // 执行一些其他的必要操作
   // ...
   // 
+  if_define_stage = 1;
   if (program.values.len > 0 && !(mode))
     printf("   .data\n");
   Visit(program.values, mode);
+
+  cout << endl;
+
   // 访问所有函数
+  if_define_stage = 0;
   if (!mode)
     printf("   .text\n   .globl main\n");
   Visit(program.funcs, mode);
@@ -454,9 +480,18 @@ void Visit(const koopa_raw_value_t &value, const int mode) {
     case KOOPA_RVT_FUNC_ARG_REF :
       // do nothing, we can tackle this in the section of 
       break;
-    default:
+    case KOOPA_RVT_GLOBAL_ALLOC:
+      if (if_define_stage){
+        Global_name = string(value->name + 1);
+        Define(kind.data.global_alloc);
+      }
+      else{
+        // Do Nothing
+      }
       break;
-      // 其他类型暂时遇不到
+    default:
+      // break;
+      // // 其他类型暂时遇不到
       cout << "Type = " << kind.tag << endl;
       assert(false);
   }
