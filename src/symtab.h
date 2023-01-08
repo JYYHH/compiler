@@ -16,8 +16,10 @@ class SymbolTableItem {
     // Last Bit of 'sel' : 0 -> const / 1 -> var (或者其他能变的东西) ; 
     // First Bit of 'sel' : 0 -> unvalued before / 1 -> has been valued 
     // special sel : 
-        // 32 -> func without return value
-        // 40 -> func with return value
+        // 32 -> func without return value (leaf func)
+        // 40 -> func with return value (leaf func)
+        // 48 -> func without return value (non-leaf func)
+        // 56 -> func with return value (non-leaf func)
         // 65 -> func_param
 
     int val; // value
@@ -28,6 +30,7 @@ class SymbolTableItem {
     int VarVal();
     void SetVal(const int &new_val); 
     void BecomeUnknown();
+    void BecomeUnLeaf();
 };
 
 class SymbolTable {

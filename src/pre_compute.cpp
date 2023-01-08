@@ -20,6 +20,7 @@ using namespace std;
 int total_blk_num = 0;
 int bin_precompute_for_var = 0; // 用来在 while(exp) 中关闭 exp 对于变量Var 依赖的提前计算功能
 // 用来预处理函数的第一个 Block 开头需要的信息
+string now_func_name;
 string funcparam_name; // 全局的temp变量，用来维护扫描到的 Param 的名字
 std::vector< std::unique_ptr<BaseAST> > *glb_funcfparam;
 
@@ -47,8 +48,16 @@ void CompUnitAST :: PreCompute(){
 }
 
 void FuncDefAST :: PreCompute(){
+    now_func_name = ident;
     glb_funcfparam = funcfparam;
     block->PreCompute();
+
+    // check whether a function is leaf function
+    // 16 -> non-leaf
+    // 0 -> leaf
+
+    // auto ret = BaseAST::glbsymbtl->GetItemByName(ident);
+    // cout << ident << " = " << (ret->VarType() & 16) << endl;
 }
 
 void FuncFParamAST :: PreCompute(){
@@ -352,6 +361,12 @@ void UnaryExpAST :: PreCompute(){
         std::vector< std::unique_ptr<BaseAST> > &now_vec = *funcrparam; 
         for (int i=0;i<child_num;i++)
             now_vec[i]->PreCompute();
+        
+        auto ret = BaseAST::glbsymbtl->GetItemByName(now_func_name);
+        if (ret == NULL)
+            exit(13);
+
+        ret->BecomeUnLeaf(); // 由于调用了其他函数，所以当前的函数需要变成非叶子节点
 
         can_compute = 0;
         val = 1 << 31;

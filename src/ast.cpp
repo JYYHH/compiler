@@ -588,7 +588,7 @@ void VarDefAST :: IRDump() const {
             exit(12);
     }
     else{
-        //        函数内的变量
+        // 函数内的变量
         //@x = alloc i32
         std::cout << "    @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << endl;
         // 保证 ident 在当前 symbol table 里

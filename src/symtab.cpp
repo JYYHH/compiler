@@ -20,6 +20,10 @@ void SymbolTableItem :: BecomeUnknown(){
     sel &= 1;
 }
 
+void SymbolTableItem :: BecomeUnLeaf(){
+    sel |= (1 << 4);
+}
+
 void SymbolTable :: Insert(std::string &name, SymbolTableItem &STitem){
     if (ST.count(name))
         exit(3);
