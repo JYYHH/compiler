@@ -1,7 +1,6 @@
 #pragma once
 
 #include "symtab.h"
-#include <vector>
 /*
     Notes here:
         1. Dump() 输出基本结构
@@ -323,6 +322,7 @@ class StmtAST : public BaseAST {
   std::unique_ptr<BaseAST> exp, optionalexp, block, glbif;
   std::string lval;
   SymbolTable *lval_belong;
+  std::vector< std::unique_ptr<BaseAST> > *lval_ref;
   int sel;
   void Dump(int sj) const override;
   void IRDump() const override;
@@ -427,6 +427,7 @@ class PrimaryExpAST : public BaseAST {
   std::unique_ptr<BaseAST> exp;
   std::string lval;
   SymbolTable *lval_belong;
+  std::vector< std::unique_ptr<BaseAST> > *lval_ref;
   int number;
   int sel;
   void Dump(int sj) const override;
@@ -462,6 +463,9 @@ class BlockItemAST : public BaseAST {
 class InitValAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> exp;
+  std::vector< std::unique_ptr<BaseAST> > *initvals;
+  int sel;
+  int child_num;
 
   void Dump(int sj) const override;
   void IRDump() const override;
@@ -480,6 +484,9 @@ class ConstExpAST : public BaseAST {
 class ConstInitValAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> constexp;
+  std::vector< std::unique_ptr<BaseAST> > *constinitvals;
+  int sel;
+  int child_num;
 
   void Dump(int sj) const override;
   void IRDump() const override;
@@ -490,6 +497,9 @@ class ConstDefAST : public BaseAST {
  public:
   std::unique_ptr<BaseAST> constinitval;
   std::string ident;
+  std::vector< std::unique_ptr<BaseAST> > *constexp;
+  int child_num;
+  int sel;
 
   void Dump(int sj) const override;
   void IRDump() const override;
@@ -510,6 +520,8 @@ class VarDefAST : public BaseAST {
  public:
   std::string ident;
   std::unique_ptr<BaseAST> initval;
+  std::vector< std::unique_ptr<BaseAST> > *constexp;
+  int child_num;
   int sel;
 
   void Dump(int sj) const override;

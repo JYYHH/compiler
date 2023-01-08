@@ -409,6 +409,8 @@ void InitValAST :: PreCompute(){
 void ConstExpAST :: PreCompute(){
     exp->PreCompute();
     PreComputeAssign(exp);
+    if (exp->can_compute == 0)
+        exit(5);
 }
 
 void ConstInitValAST :: PreCompute(){
@@ -469,8 +471,6 @@ void VarDeclAST :: PreCompute(){
 void ConstDefAST :: PreCompute(){
     constinitval->PreCompute();
 
-    if (constinitval->can_compute == 0)
-      exit(5);
     // Because ConstDef must be computed in the compiling time, 
       // so we don't use can_compute, it must be 1
 

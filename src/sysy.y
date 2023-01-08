@@ -56,6 +56,9 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
 %type <ast_list> CompUnitList FuncFParams FuncRParams FuncFParamsTrue FuncRParamsTrue
 %type <ast_val> FuncFParam FuncOrDecl
 
+// Lv_9 Array
+%type <ast_list> SIZE_ELEMENT InitVals InitValsTrue ConstInitVals ConstInitValsTrue Refer_ELEMENT
+
 %type <str_val> LVal BType
 %type <int_val> Number
 
@@ -264,6 +267,14 @@ Stmt
     ast->sel = 6;
     $$ = ast;
   } 
+  | LVal Refer_ELEMENT '=' Exp ';' {
+    auto ast = new StmtAST();
+    ast->exp = unique_ptr<BaseAST>($4);
+    ast->lval = *unique_ptr<string>($1);
+    ast->lval_ref = ($2);
+    ast->sel = 7;
+    $$ = ast;
+  }
   ;
 
 Exp
@@ -448,6 +459,13 @@ PrimaryExp
     ast->lval = *unique_ptr<string>($1);
     $$ = ast;
   }
+  | LVal Refer_ELEMENT {
+    auto ast = new PrimaryExpAST();
+    ast->sel = 3;
+    ast->lval = *unique_ptr<string>($1);
+    ast->lval_ref = ($2);
+    $$ = ast;
+  }
   ;
 
 Number
@@ -464,11 +482,63 @@ LVal
   }
   ;
 
+InitVals
+  : {
+    $$ = new std::vector< std::unique_ptr<BaseAST> >;
+  }
+  | InitValsTrue {
+    $$ = ($1);
+  }
+  ;
+
+InitValsTrue
+  : InitVal {
+    auto ret = new std::vector< std::unique_ptr<BaseAST> >;
+    (*ret).push_back( unique_ptr<BaseAST>($1) );
+    $$ = ret;
+  }
+  | InitValsTrue ',' InitVal {
+    auto ret = ($1);
+    (*ret).push_back( unique_ptr<BaseAST>($3) );
+    $$ = ret;
+  }
+  ;
+
 InitVal
   : Exp {
     auto ast = new InitValAST();
     ast->exp = unique_ptr<BaseAST>($1);
+    ast->sel = 0;
     $$ = ast;
+  }
+  | '{' InitVals '}' {
+    auto ast = new InitValAST();
+    ast->initvals = ($2);
+    ast->child_num = (int)(*(ast->initvals)).size();
+    ast->sel = 1;
+    $$ = ast;
+  }
+  ;
+
+ConstInitVals
+  : {
+    $$ = new std::vector< std::unique_ptr<BaseAST> >;
+  }
+  | ConstInitValsTrue {
+    $$ = ($1);
+  }
+  ;
+
+ConstInitValsTrue
+  : ConstInitVal {
+    auto ret = new std::vector< std::unique_ptr<BaseAST> >;
+    (*ret).push_back( unique_ptr<BaseAST>($1) );
+    $$ = ret;
+  }
+  | ConstInitValsTrue ',' ConstInitVal {
+    auto ret = ($1);
+    (*ret).push_back( unique_ptr<BaseAST>($3) );
+    $$ = ret;
   }
   ;
 
@@ -483,7 +553,15 @@ ConstExp
 ConstInitVal
   : ConstExp {
     auto ast = new ConstInitValAST();
+    ast->sel = 0;
     ast->constexp = unique_ptr<BaseAST>($1);
+    $$ = ast;
+  }
+  | '{' ConstInitVals '}' {
+    auto ast = new ConstInitValAST();
+    ast->constinitvals = ($2);
+    ast->child_num = (int)(*(ast->constinitvals)).size();
+    ast->sel = 1;
     $$ = ast;
   }
   ;
@@ -556,6 +634,23 @@ VarDef
     ast->sel = 1;
     $$ = ast;
   }
+  | IDENT SIZE_ELEMENT {
+    auto ast = new VarDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->constexp = ($2);
+    ast->child_num = (int)(*(ast->constexp)).size();
+    ast->sel = 2;
+    $$ = ast;
+  }
+  | IDENT SIZE_ELEMENT '=' InitVal {
+    auto ast = new VarDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->constexp = ($2);
+    ast->child_num = (int)(*(ast->constexp)).size();
+    ast->initval = unique_ptr<BaseAST>($4);
+    ast->sel = 3;
+    $$ = ast; 
+  }
   ;
 
 VarDecl
@@ -581,11 +676,47 @@ VarDecl_inter
   }
   ;
 
+SIZE_ELEMENT
+  : '[' ConstExp ']' {
+    auto ret = new std::vector< std::unique_ptr<BaseAST> >;
+    (*ret).push_back( unique_ptr<BaseAST>($2) );
+    $$ = ret;
+  }
+  | SIZE_ELEMENT '[' ConstExp ']' {
+    auto ret = ($1);
+    (*ret).push_back( unique_ptr<BaseAST>($3) );
+    $$ = ret;
+  }
+  ;
+
+Refer_ELEMENT
+  : '[' Exp ']' {
+    auto ret = new std::vector< std::unique_ptr<BaseAST> >;
+    (*ret).push_back( unique_ptr<BaseAST>($2) );
+    $$ = ret;
+  }
+  | Refer_ELEMENT '[' Exp ']' {
+    auto ret = ($1);
+    (*ret).push_back( unique_ptr<BaseAST>($3) );
+    $$ = ret;
+  }
+  ;
+
 ConstDef
   : IDENT '=' ConstInitVal {
     auto ast = new ConstDefAST();
     ast->ident = *unique_ptr<string>($1);
     ast->constinitval = unique_ptr<BaseAST>($3);
+    ast->sel = 0;
+    $$ = ast;
+  }
+  | IDENT SIZE_ELEMENT '=' ConstInitVal {
+    auto ast = new ConstDefAST();
+    ast->ident = *unique_ptr<string>($1);
+    ast->constexp = ($2);
+    ast->child_num = (int)(*(ast->constexp)).size();
+    ast->constinitval = unique_ptr<BaseAST>($4);
+    ast->sel = 1;
     $$ = ast;
   }
   ;

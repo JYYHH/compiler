@@ -9,6 +9,7 @@
 
 #include <unordered_map>
 #include <stack>
+#include <vector>
 
 class SymbolTableItem {
  public:
@@ -21,11 +22,15 @@ class SymbolTableItem {
         // 48 -> func without return value (non-leaf func)
         // 56 -> func with return value (non-leaf func)
         // 65 -> func_param
+        // 128 -> const array
+        // 129 -> var array
 
     int val; // value
+    int dimension;
+    std::vector<int> *dimension_item;
     
-    SymbolTableItem(int SEL) : sel(SEL),val(1 << 31){}
-    SymbolTableItem(int SEL, int VAL) : sel(SEL|2),val(VAL){}
+    SymbolTableItem(int SEL) : sel(SEL),val(1 << 31), dimension(0){}
+    SymbolTableItem(int SEL, int VAL) : sel(SEL|2),val(VAL), dimension(0){}
     int VarType();
     int VarVal();
     void SetVal(const int &new_val); 
