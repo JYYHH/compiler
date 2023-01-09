@@ -261,6 +261,8 @@ class FuncDefAST : public BaseAST {
 class FuncFParamAST : public BaseAST {
  public:
   std::string ident, btype;
+  int sel, child_num;
+  std::vector< std::unique_ptr<BaseAST> > *arrconst;
   void Dump(int sj) const override;
   void IRDump() const override;
   void PreCompute() override;
@@ -575,4 +577,4 @@ std::string btype_transfer(std::string &BTYPE);
 void IR_alloc_code_gen_const(int lev, const ConstDefAST* ast);
 void IR_alloc_code_gen2(int lev, SymbolTableItem* tbl_item, int stride, int position);
 void IR_alloc_code_gen_REALVAR(int lev, SymbolTableItem* tbl_item, int stride, int position);
-inline void load_matrix_pointer(SymbolTableItem* tbl_item, std::vector< std::unique_ptr<BaseAST> > *LVAL_ref);
+inline void load_matrix_pointer(SymbolTableItem* tbl_item, std::vector< std::unique_ptr<BaseAST> > *LVAL_ref, int from_param);

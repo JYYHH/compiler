@@ -57,6 +57,10 @@ void FuncFParamAST :: Dump(int sj) const {
     HandleSJ(sj);
     std::cout << "FuncFParamAST { ";
     std::cout << "Type: " << btype << ", Name: " << ident;
+    if (sel){
+        for(int i=0;i<=child_num;i++)
+            std::cout << "[]";
+    }
     std::cout << " }";
 }
 void BlockAST :: Dump(int sj) const {

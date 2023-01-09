@@ -63,6 +63,10 @@ void FuncDefAST :: PreCompute(){
 
 void FuncFParamAST :: PreCompute(){
     funcparam_name = ident;
+    if (sel){
+        for(int i=0;i<child_num;i++)
+            (*arrconst)[i]->PreCompute();
+    }
 }
 
 void BlockAST :: PreCompute(){
@@ -79,6 +83,9 @@ void BlockAST :: PreCompute(){
         for (int i=0; i<BOUND; i++){
             now_vec[i]->PreCompute();
             auto FUNCPARAM = new SymbolTableItem((1 << 6) | 1);
+            // cout << i << ' ' << FUNCPARAM->VarType() << endl;
+            FUNCPARAM->dimension = ((FuncFParamAST *)(now_vec[i].get()))->child_num + 1; 
+            // 注意上面是由于我们数组参数是省略的第一维
             present_tbl()->Insert(funcparam_name, *FUNCPARAM);
         }
 
@@ -408,6 +415,11 @@ void PrimaryExpAST :: PreCompute(){
         lval_belong = pres_symbtl->present;
         if (ret == NULL)
             exit(4);
+
+        if (ret->VarType() & 128){ // 遇到了把数组做参数传进去的，一律返回
+            can_compute = 0;
+            return;
+        }
         
         can_compute = (ret->VarType() >> 1) & (1 ^ ((bin_precompute_for_var != 0) & ret->VarType())) & (lval_belong != BaseAST::glbsymbtl);
         // 如果我们暂时关了 precompute功能 (主要可能是因为While循环) ，且要用的是 Var，那么这个 PrimaryExp 也是不能优化的

@@ -33,6 +33,7 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
   int int_val;
   BaseAST *ast_val; // 用来返回每个非终结符对应的子语法树
   std::vector< std::unique_ptr<BaseAST> > *ast_list; // 用来返回vector指针，vector用来存所有子节点
+  FuncFParamAST *ast_my_val; // 就是皮
 }
 %define parse.error verbose
 %token INT RETURN CONST IF ELSE WHILE BREAK CONTINUE VOID
@@ -57,7 +58,8 @@ SymbolTable * BaseAST::glbsymbtl = new SymbolTable();
 %type <ast_val> FuncFParam FuncOrDecl
 
 // Lv_9 Array
-%type <ast_list> SIZE_ELEMENT InitVals InitValsTrue ConstInitVals ConstInitValsTrue Refer_ELEMENT
+%type <ast_list> SIZE_ELEMENT InitVals InitValsTrue ConstInitVals ConstInitValsTrue Refer_ELEMENT ArrArr
+%type <ast_my_val> FW
 
 %type <str_val> LVal BType
 %type <int_val> Number
@@ -152,12 +154,38 @@ FuncFParamsTrue
   }
   ;
 
-FuncFParam
+ArrArr
+  : '[' ']' {
+    $$ = new std::vector< std::unique_ptr<BaseAST> >;
+  }
+  | ArrArr '[' ConstExp ']' {
+    auto ret = ($1);
+    (*ret).push_back( unique_ptr<BaseAST>($3) );
+    $$ = ret;
+  }
+  ;
+
+FW
   : BType IDENT {
-      auto ast = new FuncFParamAST();
-      ast->btype = *unique_ptr<string>($1);
-      ast->ident = *unique_ptr<string>($2);
-      ast->can_compute = 0;
+    auto ast = new FuncFParamAST();
+    ast->btype = *unique_ptr<string>($1);
+    ast->ident = *unique_ptr<string>($2);
+    ast->can_compute = 0;
+    $$ = ast;
+  }
+  ;
+
+FuncFParam
+  : FW {
+      auto ast = ($1);
+      ast->sel = 0;
+      $$ = ast;
+  }
+  | FW ArrArr {
+      auto ast = ($1);
+      ast->arrconst = ($2);
+      ast->child_num = (*(ast->arrconst)).size();
+      ast->sel = 1;
       $$ = ast;
   }
   ;

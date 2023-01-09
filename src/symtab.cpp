@@ -1,4 +1,5 @@
 #include <string>
+#include <iostream>
 #include "symtab.h"
 
 using namespace std;
@@ -17,7 +18,7 @@ void SymbolTableItem :: SetVal(const int &new_val){
 }
 
 void SymbolTableItem :: BecomeUnknown(){
-    sel &= 1;
+    sel ^= (sel & 2);
 }
 
 void SymbolTableItem :: BecomeUnLeaf(){

@@ -45,7 +45,7 @@ int OR_num = 0, AND_num = 0;
 int Continue_num = 0, Break_num = 0;
 stack <int> while_stack;
 SymbolTableItem* var_need_valued = NULL;
-string var_need_valued_name;
+stack<string> var_need_valued_name;
 int newest_for_each_level[33];
 
 inline void UPDATE(){
@@ -112,8 +112,9 @@ void FuncDefAST :: IRDump() const {
     std::vector< std::unique_ptr<BaseAST> > &now_vec = *funcfparam; 
     for (int i=0; i<child_num; i++){
         if (i) std::cout << ", ";
+        funcparam_name_ir = ((const FuncFParamAST*)now_vec[i].get())->ident;
+        std::cout << '@' << funcparam_name_ir << ": ";
         now_vec[i]->IRDump();
-        std::cout << '@' << funcparam_name_ir << ": " << funcparam_btype;
     }
 
     std::cout << ')';
@@ -127,8 +128,10 @@ void FuncDefAST :: IRDump() const {
     std::cout << " %" << "entry:" << endl;
     
     for (int i=0; i<child_num; i++){
+        funcparam_name_ir = ((const FuncFParamAST*)now_vec[i].get())->ident;
+        cout << "    %" << funcparam_name_ir << " = alloc ";
         now_vec[i]->IRDump();
-        cout << "    %" << funcparam_name_ir << " = alloc i32" << endl;
+        cout << endl;
         cout << "    store @" << funcparam_name_ir << ", %" << funcparam_name_ir << endl;
         // 但如果后续在函数中修改了函数 Param 可能会寄掉
     }
@@ -140,12 +143,34 @@ void FuncDefAST :: IRDump() const {
         std::cout << "    ret" << endl; // 愿称你为托底天王
     std::cout << "}" << endl;
 }
+
+void IR_alloc_code_gen_FuncF(int lev, const FuncFParamAST* ast){
+    if (lev == ast->child_num - 1){
+        cout << "[i32, " << (*(ast->arrconst))[lev]->val << ']';
+        return;
+    }
+    cout << '[';
+    IR_alloc_code_gen_FuncF(lev + 1, ast);
+    cout << ", " << (*(ast->arrconst))[lev]->val << ']';
+}
+
 void FuncFParamAST :: IRDump() const {
-    funcparam_name_ir = ident;
-    if (btype == "int")
-        funcparam_btype = "i32";
-    else 
-        funcparam_btype = "Please Check your Func Param Btype";
+    if (sel == 0){
+        if (btype == "int")
+            // funcparam_btype = "i32";
+            cout << "i32";
+        else{
+
+        } 
+    }
+    else{
+        if (child_num == 0)
+            cout << "*i32";
+        else{
+            cout << "*";
+            IR_alloc_code_gen_FuncF(0, (const FuncFParamAST*)this);
+        }
+    }
 }
 void BlockAST :: IRDump() const {
     push_into_tbl_stk(symbtl, 1);
@@ -287,18 +312,25 @@ void StmtAST :: IRDump() const {
 
         string alter_one = lval;
         auto ret = lval_belong->GetItemByName(alter_one);
-        var_need_valued_name = lval_belong->ST_name + "_" + lval;
-        load_matrix_pointer(ret, lval_ref);
+        if (((ret->VarType() >> 6) & 1)){
+            var_need_valued_name.push(lval);
+            load_matrix_pointer(ret, lval_ref, 1);
+        }
+        else{
+            var_need_valued_name.push(lval_belong->ST_name + "_" + lval);
+            load_matrix_pointer(ret, lval_ref, 0);
+        }
 
         if (exp->can_compute == MODE){
-            cout << "    store " << exp->val << ", %" <<  "ptr_" << ret->dimension - 1 << '_' << newest_for_each_level[ret->dimension - 1] - 1 << endl;
+            cout << "    store " << exp->val << ", %" <<  "ptr_" << (*lval_ref).size() - 1 << '_' << newest_for_each_level[(*lval_ref).size() - 1] - 1 << endl;
         }
         else{
             if (pre_01 >> 1)
-                cout << "    store " << var_ins[pre_num - 1] << ", %" <<  "ptr_" << ret->dimension - 1 << '_' << newest_for_each_level[ret->dimension - 1] - 1 << endl;
+                cout << "    store " << var_ins[pre_num - 1] << ", %" <<  "ptr_" << (*lval_ref).size() - 1 << '_' << newest_for_each_level[(*lval_ref).size() - 1] - 1 << endl;
             else
-                cout << "    store %" << pre_num - 1 << ", %" <<  "ptr_" << ret->dimension - 1 << '_' << newest_for_each_level[ret->dimension - 1] - 1 << endl;
+                cout << "    store %" << pre_num - 1 << ", %" <<  "ptr_" << (*lval_ref).size() - 1 << '_' << newest_for_each_level[(*lval_ref).size() - 1] - 1 << endl;
         }
+        var_need_valued_name.pop();
     }
 }
 
@@ -519,7 +551,7 @@ void UnaryExpAST :: IRDump() const {
             if (i)
                 cout << ", ";
             Pr &now_pr = (*now_exp)[i];
-            if (now_pr.second >> 1)
+            if ((now_pr.second >> 1) && (now_pr.second != -1))
                 cout << var_ins[now_pr.first];
             else
                 cout << '%' << now_pr.first;
@@ -538,10 +570,25 @@ void PrimaryExpAST :: IRDump() const {
         string alter_one = lval;
         auto ret = lval_belong->GetItemByName(alter_one);
         // cout << "PrimaryExpAST Belong to Block: " << lval_belong->ST_name << endl;
+
+        if (ret->VarType() & 128) {
+            // We pass an array (whole) as the parameter to function
+            // %2 = getelemptr @arr, 0
+            if (ret->VarType() & 64)
+                cout << "    %" << var_num << " = getelemptr @" << lval << ", 0" << endl;
+            else
+                cout << "    %" << var_num << " = getelemptr @" << present_tbl()->ST_name << '_' << lval << ", 0" << endl;
+            var_num ++, is_01 = -1; 
+            return;
+        }
+
         if (!(ret->VarType() & 1)){
             alr_compute_procedure(ret->VarVal());
             return;
         }
+
+        // cout << lval << " ,,, " << ret->VarType() << endl;
+
         if (ret->VarType() & 64)
             std::cout << "    %" << var_num << " = load %" << lval << endl;
         else
@@ -554,23 +601,59 @@ void PrimaryExpAST :: IRDump() const {
     else{
         string alter_one = lval;
         auto ret = lval_belong->GetItemByName(alter_one);
-        var_need_valued_name = lval_belong->ST_name + "_" + lval;
-        load_matrix_pointer(ret, lval_ref);
+        if (((ret->VarType() >> 6) & 1)){
+            var_need_valued_name.push(lval);
+            load_matrix_pointer(ret, lval_ref, 1);
+        }
+        else{
+            var_need_valued_name.push(lval_belong->ST_name + "_" + lval);
+            load_matrix_pointer(ret, lval_ref, 0);
+        }   
 
-        // %value = load %ptr2 
-        std::cout << "    %" << var_num << " = load %" << "ptr_" << ret->dimension - 1 << '_' << newest_for_each_level[ret->dimension - 1] - 1 << endl;
-        is_01 = 0;
-        var_num ++;
+        // cout << lval << ' ' << ret->VarType() << endl;
+
+        // 表示，用数组传参
+        // cout << (*lval_ref).size() << ' ' << ret->dimension << endl;
+        if ((*lval_ref).size() < ret->dimension){
+            cout << "    %" << var_num << " = getelemptr %" << "ptr_" << (*lval_ref).size() - 1 << '_' << newest_for_each_level[(*lval_ref).size() - 1] - 1 << ", 0" << endl;
+            var_num ++;
+            is_01 = -1;
+        }
+        else{
+            // %value = load %ptr2 
+            std::cout << "    %" << var_num << " = load %" << "ptr_" << (*lval_ref).size() - 1 << '_' << newest_for_each_level[(*lval_ref).size() - 1] - 1 << endl;
+            is_01 = 0;
+            var_num ++;
+        }
+
+        var_need_valued_name.pop();
     }
 }
 
-void load_matrix_pointer(SymbolTableItem* tbl_item, std::vector< std::unique_ptr<BaseAST> > *LVAL_ref){
-    int DIM = tbl_item->dimension;
+int mid_param_ptr_num;
+
+void load_matrix_pointer(SymbolTableItem* tbl_item, std::vector< std::unique_ptr<BaseAST> > *LVAL_ref, int from_param){
+    int DIM = (*LVAL_ref).size();
+    
     (*LVAL_ref)[0]->IRDump();
-    if (is_01 >> 1)
-        cout << "    %" << "ptr_" << 0 << "_" << newest_for_each_level[0] << " = getelemptr @" << var_need_valued_name << ", " << var_ins[var_num - 1] << endl;
-    else 
-        cout << "    %" << "ptr_" << 0 << "_" << newest_for_each_level[0] << " = getelemptr @" << var_need_valued_name << ", %" << var_num - 1 << endl;
+    if (from_param){
+        //%0 = load %arr
+        //%1 = getptr %0, 1
+        cout << "    %" << "param_from_func_" << mid_param_ptr_num << " = load %" << var_need_valued_name.top() << endl;
+        mid_param_ptr_num ++;
+        int mid_var = (is_01 >> 1)?var_ins[var_num - 1]:var_num-1;
+        if (is_01 >> 1)
+            cout << "    %" << "ptr_" << 0 << "_" << newest_for_each_level[0] << " = getptr %" <<  "param_from_func_" << mid_param_ptr_num - 1 << ", " << mid_var << endl;
+        else 
+            cout << "    %" << "ptr_" << 0 << "_" << newest_for_each_level[0] << " = getptr %" <<  "param_from_func_" << mid_param_ptr_num - 1 << ", %" << mid_var << endl;
+    }
+    else{
+        if (is_01 >> 1)
+            cout << "    %" << "ptr_" << 0 << "_" << newest_for_each_level[0] << " = getelemptr @" << var_need_valued_name.top() << ", " << var_ins[var_num - 1] << endl;
+        else 
+            cout << "    %" << "ptr_" << 0 << "_" << newest_for_each_level[0] << " = getelemptr @" << var_need_valued_name.top() << ", %" << var_num - 1 << endl;
+    }
+    
     newest_for_each_level[0] ++;
 
     for(int i=1;i<DIM;i++){
@@ -620,7 +703,7 @@ void IR_alloc_code_gen_REALVAR(int lev, SymbolTableItem* tbl_item, int stride, i
             if (lev)
                 cout << "    %" << "ptr_" << lev << "_" << newest_for_each_level[lev] << " = getelemptr %" << "ptr_" << lev - 1 << '_' << newest_for_each_level[lev - 1] - 1 <<  ", " << i << endl;
             else
-                cout << "    %" << "ptr_" << lev << "_" << newest_for_each_level[lev] << " = getelemptr @" << var_need_valued_name << ", " << i << endl;
+                cout << "    %" << "ptr_" << lev << "_" << newest_for_each_level[lev] << " = getelemptr @" << var_need_valued_name.top() << ", " << i << endl;
             newest_for_each_level[lev] ++;
             IR_alloc_code_gen_REALVAR(lev + 1, tbl_item, stride / next_len, position + i * stride);
         }
@@ -631,7 +714,7 @@ void IR_alloc_code_gen_REALVAR(int lev, SymbolTableItem* tbl_item, int stride, i
             if (lev)
                 cout << "    %" << "ptr_" << lev << "_" << newest_for_each_level[lev] << " = getelemptr %" << "ptr_" << lev - 1 << '_' << newest_for_each_level[lev - 1] - 1 <<  ", " << i << endl;
             else
-                cout << "    %" << "ptr_" << lev << "_" << newest_for_each_level[lev] << " = getelemptr @" << var_need_valued_name << ", " << i << endl;
+                cout << "    %" << "ptr_" << lev << "_" << newest_for_each_level[lev] << " = getelemptr @" << var_need_valued_name.top() << ", " << i << endl;
             VAR_NUM = tbl_item->arr[position + i] >> 1;
             IS_01 = tbl_item->arr[position + i] & 1;
             newest_for_each_level[lev] ++;
@@ -791,10 +874,11 @@ void VarDefAST :: IRDump() const {
             if (sel == 3){
                 auto lll = ident;
                 var_need_valued = present_tbl()->GetItemByName(lll);
-                var_need_valued_name = present_tbl()->ST_name + "_" + ident;
+                var_need_valued_name.push(present_tbl()->ST_name + "_" + ident);
                 if (((InitValAST *)initval.get())->sel == 0)
                     exit(15);
                 initval->IRDump();
+                var_need_valued_name.pop();
             }
         }
     }
