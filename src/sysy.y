@@ -844,7 +844,7 @@ OptionalExp
   | {
     auto ast = new OptionalExpAST();
     ast->exp = NULL;
-    ast->can_compute = 0;
+    ast->can_compute = 99;
     $$ = ast;
   }
   ;

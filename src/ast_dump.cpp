@@ -102,6 +102,7 @@ void StmtAST :: Dump(int sj) const {
     }
     else if (sel == 4){
         exp->Dump(sj + 1);
+        cout << ", " << endl;
         glbif->Dump(sj + 1);
     }
     else if (sel == 5){

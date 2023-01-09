@@ -210,7 +210,7 @@ void StmtAST :: IRDump() const {
         // if (Func_Ret > 1) return;
 
         if (now_type == "int"){
-            if (optionalexp == NULL)
+            if (optionalexp->can_compute == 99)
                 exit(9);
             if (can_compute == MODE)
                 std::cout << "    ret " << val << endl;
@@ -888,7 +888,7 @@ void VarDefAST :: IRDump() const {
 // ------------------------------------ Lv 5 Block -------------------
 
 void OptionalExpAST :: IRDump() const {
-    if (PreComputeProcedure()) return;
+    if (PreComputeProcedure() || can_compute == 99) return;
     exp->IRDump();
 }
 

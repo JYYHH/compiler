@@ -31,7 +31,7 @@ int main(int argc, const char *argv[]) { // compiler 模式 输入文件 -o 输�
   auto ret = yyparse(ast);
   assert(!ret);
   cout << "This is our original AST :" << endl << endl;
-  // ast->Dump(0);
+  ast->Dump(0);
   cout << endl;
 
   // 生成中间代码

@@ -149,7 +149,7 @@ void IfElseStmtAST :: PreCompute(){
 
 void StmtAST :: PreCompute(){
     if (sel == 3 || sel == 1){
-        if (optionalexp != NULL){
+        if (optionalexp->can_compute != 99){ // == 99 -> NULL
             optionalexp->PreCompute();
             PreComputeAssign(optionalexp);
         }
@@ -666,7 +666,7 @@ void OptionalExpAST :: PreCompute(){
         PreComputeAssign(exp);
     }
     else{
-        can_compute = 1;
+        can_compute = 99;
         val = 0;
         // Cheat Code
     }
