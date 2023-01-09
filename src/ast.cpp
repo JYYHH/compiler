@@ -279,6 +279,12 @@ void StmtAST :: IRDump() const {
         std::cout << " %" << "AFTER_BREAK_" << Break_num << ':' << endl;
     }
     else{
+        int pre_num, pre_01;
+        if (exp->can_compute != MODE){
+            exp->IRDump();
+            pre_num = var_num, pre_01 = is_01;
+        }
+
         string alter_one = lval;
         auto ret = lval_belong->GetItemByName(alter_one);
         var_need_valued_name = lval_belong->ST_name + "_" + lval;
@@ -288,11 +294,10 @@ void StmtAST :: IRDump() const {
             cout << "    store " << exp->val << ", %" <<  "ptr_" << ret->dimension - 1 << '_' << newest_for_each_level[ret->dimension - 1] - 1 << endl;
         }
         else{
-            exp->IRDump();
-            if (is_01 >> 1)
-                cout << "    store " << var_ins[var_num - 1] << ", %" <<  "ptr_" << ret->dimension - 1 << '_' << newest_for_each_level[ret->dimension - 1] - 1 << endl;
+            if (pre_01 >> 1)
+                cout << "    store " << var_ins[pre_num - 1] << ", %" <<  "ptr_" << ret->dimension - 1 << '_' << newest_for_each_level[ret->dimension - 1] - 1 << endl;
             else
-                cout << "    store %" << var_num - 1 << ", %" <<  "ptr_" << ret->dimension - 1 << '_' << newest_for_each_level[ret->dimension - 1] - 1 << endl;
+                cout << "    store %" << pre_num - 1 << ", %" <<  "ptr_" << ret->dimension - 1 << '_' << newest_for_each_level[ret->dimension - 1] - 1 << endl;
         }
     }
 }
