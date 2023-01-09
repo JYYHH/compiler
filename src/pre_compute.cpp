@@ -3,11 +3,11 @@
         1. while 内的优化 (maybe no solution)
         2. 全局变量的优化 (maybe no solution)
         3. 函数参数调用的优化 (maybe no solution)
-        4. 赋值 和 引用语句的, LCA的优化
+        4. 赋值 和 引用语句 的, LCA的优化
 
     可能存在的隐患：
         1. 不确定如果在函数内部对 Param 进行修改会有什么后效性 (虽然确实可以这样做)
-        
+
 */
 
 #include <string>
@@ -23,6 +23,7 @@ int bin_precompute_for_var = 0; // 用来在 while(exp) 中关闭 exp 对于变�
 string now_func_name;
 string funcparam_name; // 全局的temp变量，用来维护扫描到的 Param 的名字
 std::vector< std::unique_ptr<BaseAST> > *glb_funcfparam;
+SymbolTableItem* const_need_valued = NULL;
 
 inline void BaseAST :: PreComputeAssign(std::unique_ptr<BaseAST> &child){
     if (child->can_compute == 1){
@@ -209,6 +210,23 @@ void StmtAST :: PreCompute(){
     else if (sel == 6){
         // just do nothing
     }
+    else if (sel == 7){
+        exp->PreCompute();
+
+        auto pres_symbtl = present_tbl();
+        auto ret = pres_symbtl->GetItemByName(lval);
+        lval_belong = pres_symbtl->present;
+
+        if (ret == NULL)
+            exit(4);
+        if (!(ret->VarType() & 1))
+            exit(6);
+
+        std::vector< std::unique_ptr<BaseAST> > &now_vec = *lval_ref; 
+        for(int i=0;i<child_num;i++) 
+            now_vec[i]->PreCompute();
+        can_compute = 0;
+    }
 }
 
 void ExpAST :: PreCompute(){
@@ -382,7 +400,7 @@ void PrimaryExpAST :: PreCompute(){
         can_compute = 1;
         val = number;
     }
-    else {
+    else if (sel == 2){
         // CAN'T PRECOMPUTE, if and only if its state now is known, not matter because
             // unknown value or unknown logic result
         auto pres_symbtl = present_tbl();
@@ -399,11 +417,61 @@ void PrimaryExpAST :: PreCompute(){
         // 但是全局常量还是能用的
         val = ret->VarVal();
     }
+    else{
+        can_compute = 0;
+        // array
+        auto pres_symbtl = present_tbl();
+        auto ret = pres_symbtl->GetItemByName(lval);
+        lval_belong = pres_symbtl->present;
+        if (ret == NULL)
+            exit(4);
+
+        std::vector< std::unique_ptr<BaseAST> > &now_vec = *lval_ref; 
+        for(int i=0;i<child_num;i++) 
+            now_vec[i]->PreCompute();
+    }
 }
 
+void InitValAST :: Solve_array_assign(int lev){
+    if (sel == 0){
+        exp->PreCompute();
+        if (!exp->can_compute)
+            exit(12);
+        const_need_valued->PushBack(exp->val);
+    }
+    else{
+        if (lev >= const_need_valued->dimension)
+            exit(16);
+
+        std::vector< std::unique_ptr<BaseAST> > &now_vec = *initvals; 
+        for(int i=0;i<child_num;i++)
+            ((InitValAST *)(now_vec[i].get()))->Solve_array_assign(const_need_valued->check_lev());
+        
+        if (const_need_valued->filled > const_need_valued->mul_dim)
+            exit(17);
+
+        int align_size = const_need_valued->lev_size(lev);
+        while(const_need_valued->filled == 0 || const_need_valued->filled % align_size)
+            const_need_valued->PushBack(0);
+    }
+}
+
+int walking_mode = 0;
 void InitValAST :: PreCompute(){
-    exp->PreCompute();
-    PreComputeAssign(exp);
+    if (sel == 0){
+        if (const_need_valued)
+            exit(14);
+        exp->PreCompute();
+        PreComputeAssign(exp);
+    }
+    else if (walking_mode){
+        for (int i=0;i<child_num;i++)
+            (*(initvals))[i]->PreCompute();
+    }
+    else {
+        Solve_array_assign(0);
+        const_need_valued = NULL;
+    }
 }
 
 void ConstExpAST :: PreCompute(){
@@ -413,9 +481,39 @@ void ConstExpAST :: PreCompute(){
         exit(5);
 }
 
+void ConstInitValAST :: Solve_array_assign(int lev){
+    if (sel == 0){
+        constexp->PreCompute();
+        const_need_valued->PushBack(constexp->val);
+    }
+    else{
+        if (lev >= const_need_valued->dimension)
+            exit(16);
+
+        std::vector< std::unique_ptr<BaseAST> > &now_vec = *constinitvals; 
+        for(int i=0;i<child_num;i++)
+            ((ConstInitValAST *)(now_vec[i].get()))->Solve_array_assign(const_need_valued->check_lev());
+        
+        if (const_need_valued->filled > const_need_valued->mul_dim)
+            exit(17);
+
+        int align_size = const_need_valued->lev_size(lev);
+        while(const_need_valued->filled == 0 || const_need_valued->filled % align_size)
+            const_need_valued->PushBack(0);
+    }
+}
+
 void ConstInitValAST :: PreCompute(){
-    constexp->PreCompute();
-    PreComputeAssign(constexp);
+    if (sel == 0){
+        if (const_need_valued)
+            exit(14);
+        constexp->PreCompute();
+        PreComputeAssign(constexp);
+    }
+    else{
+        Solve_array_assign(-1);
+        const_need_valued = NULL;
+    }
 }
 
 void BlockItemAST :: PreCompute(){
@@ -433,17 +531,15 @@ void DeclAST :: PreCompute(){
 }
 
 void VarDefAST :: PreCompute(){
+    auto pres_symbtl = present_tbl();
     if (sel == 0){
         // Insert a non-valued item into present symbal table
-        auto pres_symbtl = present_tbl();
         auto new_symtbl_item = new SymbolTableItem(1);
         pres_symbtl->Insert(ident, *new_symtbl_item);
         can_compute = 0; // can't be decided in compiling time
     }
-    else{
+    else if (sel == 1){
         initval->PreCompute();
-
-        auto pres_symbtl = present_tbl();
         // Check Whether Already Computed
         if (initval->can_compute == 0){
             // Insert a non-valued item into present symbal table
@@ -460,6 +556,42 @@ void VarDefAST :: PreCompute(){
             can_compute = 1;
         }
     }
+    else {
+        // 统一处理，右边exp可计算与不可计算的 Var Array Define 问题
+        // 只有 if (sel == 3 && pres_symbtl == BaseAST::glbsymbtl)
+            // 这种情况，需要把我们的初始值算出来，并且如果算不出来就是语义错误
+        auto new_symtbl_item = new SymbolTableItem((1 << 7) | 1);
+        new_symtbl_item->dimension = child_num;
+        int DIM = 1;
+        new_symtbl_item->dimension_item = new std::vector<int>;
+        std::vector< std::unique_ptr<BaseAST> > &now_vec = *constexp; 
+        for (int i=0;i<child_num;i++){
+            now_vec[i]->PreCompute();
+            DIM *= now_vec[i]->val; // constexp must be computed
+            (*(new_symtbl_item->dimension_item)).push_back(now_vec[i]->val);
+        }
+        new_symtbl_item->mul_dim = DIM;
+        new_symtbl_item->arr = new int[DIM + 3];
+        new_symtbl_item->filled = 0; // 插入 filled = 0 的元素就表明是未初始化的
+
+        if (sel == 3 && pres_symbtl == BaseAST::glbsymbtl){
+            // 全局且已赋值的Var需要先算出来
+            const_need_valued = new_symtbl_item;
+            if (((InitValAST *)initval.get())->sel == 0)
+                exit(15);
+            initval->PreCompute();
+        }
+        else if(sel == 3) {
+            walking_mode = 1;
+            if (((InitValAST *)initval.get())->sel == 0)
+                exit(15);
+            initval->PreCompute();
+            walking_mode = 0;
+        }
+
+        pres_symbtl->Insert(ident, *new_symtbl_item);
+        can_compute = 0;
+    }
 }
 
 void VarDeclAST :: PreCompute(){
@@ -469,15 +601,45 @@ void VarDeclAST :: PreCompute(){
 }
 
 void ConstDefAST :: PreCompute(){
-    constinitval->PreCompute();
-
-    // Because ConstDef must be computed in the compiling time, 
-      // so we don't use can_compute, it must be 1
-
-    // Insert a const item into present symbal table
     auto pres_symbtl = present_tbl();
-    auto new_symtbl_item = new SymbolTableItem(0, constinitval->val);
+    SymbolTableItem* new_symtbl_item;
+     
+    if (sel){
+        if (((ConstInitValAST *)constinitval.get())->sel == 0)
+            exit(15);
+
+        // const array
+        new_symtbl_item = new SymbolTableItem(1 << 7);
+        new_symtbl_item->dimension = child_num;
+        int DIM = 1;
+        new_symtbl_item->dimension_item = new std::vector<int>;
+        std::vector< std::unique_ptr<BaseAST> > &now_vec = *constexp; 
+        for (int i=0;i<child_num;i++){
+            now_vec[i]->PreCompute();
+            DIM *= now_vec[i]->val; // constexp must be computed
+            (*(new_symtbl_item->dimension_item)).push_back(now_vec[i]->val);
+        }
+        new_symtbl_item->mul_dim = DIM;
+        new_symtbl_item->arr = new int[DIM + 3];
+        new_symtbl_item->filled = 0;
+
+        const_need_valued = new_symtbl_item;
+        constinitval->PreCompute();
+
+        // 搞个大新闻，放到全局变量里
+        std::cout << "global @" << pres_symbtl->ST_name << '_' << ident << " = alloc ";
+        IR_alloc_code_gen_const(0, (const ConstDefAST *)this);
+        cout << ", ";
+        IR_alloc_code_gen2(0, new_symtbl_item, new_symtbl_item->mul_dim / (*(new_symtbl_item->dimension_item))[0], 0);
+        cout << endl;
+    }
+    else{
+        // const int
+        constinitval->PreCompute();
+        new_symtbl_item = new SymbolTableItem(0, constinitval->val);
+    }
     pres_symbtl->Insert(ident, *new_symtbl_item);
+    can_compute = 1;
 }
 
 void ConstDeclAST :: PreCompute(){

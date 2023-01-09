@@ -30,15 +30,14 @@ int main(int argc, const char *argv[]) { // compiler 模式 输入文件 -o 输�
   unique_ptr<BaseAST> ast;
   auto ret = yyparse(ast);
   assert(!ret);
-  return 0;
   cout << "This is our original AST :" << endl << endl;
   // ast->Dump(0);
   cout << endl;
-  ast->PreCompute();
 
   // 生成中间代码
   auto old_stdout = dup(1);
   FILE *IRfile = freopen(output, "w", stdout);
+  ast->PreCompute();
   ast->IRDump();
   cout << endl;
   fflush(IRfile);

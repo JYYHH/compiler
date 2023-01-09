@@ -194,6 +194,9 @@
               - 而变量的后面永远不可能以 `(` 开头 (look through 了一遍我设计的文法)
               - and
 
+        27. const local arr 放全局变量了
+
+
         
 */
 
@@ -231,12 +234,6 @@ class BaseAST {
     2. using un-valued var (bad in syntax)
   */
 };
-
-// Useful functions
-SymbolTable* present_tbl();
-void push_into_tbl_stk(SymbolTable* item, int has_fa);
-void pop_tbl_stk();
-std::string btype_transfer(std::string &BTYPE);
 
 // Subclass Definition
 
@@ -323,6 +320,7 @@ class StmtAST : public BaseAST {
   std::string lval;
   SymbolTable *lval_belong;
   std::vector< std::unique_ptr<BaseAST> > *lval_ref;
+  int child_num;
   int sel;
   void Dump(int sj) const override;
   void IRDump() const override;
@@ -429,6 +427,7 @@ class PrimaryExpAST : public BaseAST {
   SymbolTable *lval_belong;
   std::vector< std::unique_ptr<BaseAST> > *lval_ref;
   int number;
+  int child_num;
   int sel;
   void Dump(int sj) const override;
   void IRDump() const override;
@@ -470,6 +469,8 @@ class InitValAST : public BaseAST {
   void Dump(int sj) const override;
   void IRDump() const override;
   void PreCompute() override;
+  void Solve_array_assign(int lev);
+  void Solve_array_assign2(int lev) const;
 };
 
 class ConstExpAST : public BaseAST {
@@ -491,6 +492,7 @@ class ConstInitValAST : public BaseAST {
   void Dump(int sj) const override;
   void IRDump() const override;
   void PreCompute() override;
+  void Solve_array_assign(int lev);
 };
 
 class ConstDefAST : public BaseAST {
@@ -564,3 +566,13 @@ class OptionalExpAST : public BaseAST {
 //  public:
 //     std::int val;
 // };
+
+// Useful functions
+SymbolTable* present_tbl();
+void push_into_tbl_stk(SymbolTable* item, int has_fa);
+void pop_tbl_stk();
+std::string btype_transfer(std::string &BTYPE);
+void IR_alloc_code_gen_const(int lev, const ConstDefAST* ast);
+void IR_alloc_code_gen2(int lev, SymbolTableItem* tbl_item, int stride, int position);
+void IR_alloc_code_gen_REALVAR(int lev, SymbolTableItem* tbl_item, int stride, int position);
+inline void load_matrix_pointer(SymbolTableItem* tbl_item, std::vector< std::unique_ptr<BaseAST> > *LVAL_ref);

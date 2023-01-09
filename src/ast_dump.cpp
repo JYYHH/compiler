@@ -104,9 +104,19 @@ void StmtAST :: Dump(int sj) const {
         HandleSJ(sj+1);
         std::cout << "CONTINUE" << endl;
     }
-    else{
+    else if (sel == 6){
         HandleSJ(sj+1);
         std::cout << "BREAK" << endl;
+    }
+    else { // 对数组元素赋值
+        HandleSJ(sj+1);
+        std::cout << lval;
+        for(int i=0;i<child_num;i++)
+            std::cout << "[]";
+        cout << endl;
+        HandleSJ(sj+1);
+        std::cout << '=' << endl;
+        exp->Dump(sj + 1);    
     }
     std::cout << endl;
     HandleSJ(sj);
@@ -275,9 +285,15 @@ void PrimaryExpAST :: Dump(int sj) const {
         HandleSJ(sj + 1);
         std::cout << "Number = " << number;
     }
+    else if(sel == 2){
+        HandleSJ(sj + 1);
+        std::cout << "VarName = " << lval;
+    }
     else{
         HandleSJ(sj + 1);
         std::cout << "VarName = " << lval;
+        for(int i=0;i<child_num;i++)
+            std::cout << "[]";
     }
     std::cout << endl;
     HandleSJ(sj);
@@ -316,8 +332,17 @@ void InitValAST :: Dump(int sj) const {
     HandleSJ(sj);
     std::cout << "InitValAST {" <<endl; 
 
-    exp->Dump(sj + 1);
-
+    if (sel == 0)
+        exp->Dump(sj + 1);
+    else{
+        std::vector< std::unique_ptr<BaseAST> > &now_vec = *initvals; 
+        HandleSJ(sj+1);
+        std::cout << "InitVAL Sub Num = " << child_num << endl;
+        for (int i=0; i<child_num; i++){
+            now_vec[i]->Dump(sj + 1);
+            std::cout << "********** End of Child " << i << endl;
+        }
+    }
     std::cout << endl;
     HandleSJ(sj);
     std::cout << "}";
@@ -338,8 +363,17 @@ void ConstInitValAST :: Dump(int sj) const {
     HandleSJ(sj);
     std::cout << "ConstInitValAST {" <<endl; 
 
-    constexp->Dump(sj + 1);
-
+    if (sel == 0)
+        constexp->Dump(sj + 1);
+    else{
+        std::vector< std::unique_ptr<BaseAST> > &now_vec = *constinitvals; 
+        HandleSJ(sj+1);
+        std::cout << "ConstInit Sub Num = " << child_num << endl;
+        for (int i=0; i<child_num; i++){
+            now_vec[i]->Dump(sj + 1);
+            std::cout << "********** End of Child " << i << endl;
+        }
+    }
     std::cout << endl;
     HandleSJ(sj);
     std::cout << "}";
@@ -350,7 +384,11 @@ void ConstDefAST :: Dump(int sj) const {
     std::cout << "ConstDefAST {" <<endl; 
     
     HandleSJ(sj + 1);
-    std::cout << "(IDENT)" << ident << '=' << endl;
+    std::cout << "(IDENT)" << ident;
+    for(int i=0;i<child_num;i++)
+        std::cout << '[' << ']';
+
+    std::cout << " =" << endl;
     constinitval->Dump(sj + 1);
 
     std::cout << endl;
@@ -383,14 +421,14 @@ void VarDefAST :: Dump(int sj) const {
     HandleSJ(sj);
     std::cout << "VarDefAST {" <<endl; 
     
-    if (sel == 1){
-        HandleSJ(sj + 1);
-        std::cout << "(IDENT)" << ident << '=' << endl;
+    HandleSJ(sj + 1);
+    std::cout << "(IDENT)" << ident;
+    for(int i=0;i<child_num;i++)
+        std::cout << '[' << ']';
+
+    if (sel & 1){
+        std::cout << " =" << endl;
         initval->Dump(sj + 1);
-    }
-    else{
-        HandleSJ(sj + 1);
-        std::cout << "(IDENT)" << ident;
     }
 
     std::cout << endl;

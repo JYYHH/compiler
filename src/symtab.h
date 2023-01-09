@@ -28,6 +28,9 @@ class SymbolTableItem {
     int val; // value
     int dimension;
     std::vector<int> *dimension_item;
+
+    int mul_dim, filled;
+    int *arr;
     
     SymbolTableItem(int SEL) : sel(SEL),val(1 << 31), dimension(0){}
     SymbolTableItem(int SEL, int VAL) : sel(SEL|2),val(VAL), dimension(0){}
@@ -36,6 +39,9 @@ class SymbolTableItem {
     void SetVal(const int &new_val); 
     void BecomeUnknown();
     void BecomeUnLeaf();
+    int check_lev(); // return correspond level
+    void PushBack(const int x);
+    int lev_size(const int lev); // return correspond subarray size
 };
 
 class SymbolTable {

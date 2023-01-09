@@ -125,6 +125,7 @@ FuncDef
     // Parsing 时直接把函数名字加到Global符号表里
     auto INSERT_ITEM = new SymbolTableItem((1 << 5) + (ast->func_type == "int") * (1 << 3)); // 把全局函数名称加到符号表里
     BaseAST::glbsymbtl->Insert(ast->ident, *INSERT_ITEM);
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -156,6 +157,7 @@ FuncFParam
       auto ast = new FuncFParamAST();
       ast->btype = *unique_ptr<string>($1);
       ast->ident = *unique_ptr<string>($2);
+      ast->can_compute = 0;
       $$ = ast;
   }
   ;
@@ -165,6 +167,7 @@ Block
     auto ast = new BlockAST();
     ast->blockitem = ($2);
     ast->child_num = (int)(*(ast->blockitem)).size();
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -175,12 +178,14 @@ GLBIf
     auto ast = new GLBIfAST();
     ast->sel = 0;
     ast->ifstmt = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | IfElseStmt {
     auto ast = new GLBIfAST();
     ast->sel = 1;
     ast->ifelsestmt = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -191,6 +196,7 @@ IfStmt
     ast->sel = 0;
     ast->exp = unique_ptr<BaseAST>($3);
     ast->glbif = unique_ptr<BaseAST>($5);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | IF '(' Exp ')' IfElseStmt ELSE IfStmt {
@@ -199,6 +205,7 @@ IfStmt
     ast->exp = unique_ptr<BaseAST>($3);
     ast->ifelsestmt = unique_ptr<BaseAST>($5);
     ast->ifstmt = unique_ptr<BaseAST>($7);
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -212,13 +219,14 @@ IfElseStmt
     ast->exp = unique_ptr<BaseAST>($3);
     ast->ifelsestmtl = unique_ptr<BaseAST>($5);
     ast->ifelsestmtr = unique_ptr<BaseAST>($7);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | Stmt {
     auto ast = new IfElseStmtAST();
     ast->sel = 1;
     ast->stmt = unique_ptr<BaseAST>($1);
-    ast->can_compute = 1;
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -229,6 +237,7 @@ Stmt
     auto ast = new StmtAST();
     ast->optionalexp = unique_ptr<BaseAST>($2);
     ast->sel = 3;
+    ast->can_compute = 0;
     $$ = ast;
   }
   | LVal '=' Exp ';' { // 赋值语句是最麻烦的
@@ -236,18 +245,22 @@ Stmt
     ast->exp = unique_ptr<BaseAST>($3);
     ast->lval = *unique_ptr<string>($1);
     ast->sel = 0;
+    ast->child_num = 0;
+    ast->can_compute = 0;
     $$ = ast;
   }
   | OptionalExp ';' {
     auto ast = new StmtAST();
     ast->optionalexp = unique_ptr<BaseAST>($1);
     ast->sel = 1;
+    ast->can_compute = 0;
     $$ = ast;
   }
   | Block {
     auto ast = new StmtAST();
     ast->sel = 2;
     ast->block = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | WHILE '(' Exp ')' GLBIf {
@@ -255,16 +268,19 @@ Stmt
     ast->sel = 4;
     ast->exp = unique_ptr<BaseAST>($3);
     ast->glbif = unique_ptr<BaseAST>($5);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | CONTINUE ';' {
     auto ast = new StmtAST();
     ast->sel = 5;
+    ast->can_compute = 0;
     $$ = ast;
   }
   | BREAK ';' {
     auto ast = new StmtAST();
     ast->sel = 6;
+    ast->can_compute = 0;
     $$ = ast;
   } 
   | LVal Refer_ELEMENT '=' Exp ';' {
@@ -272,7 +288,9 @@ Stmt
     ast->exp = unique_ptr<BaseAST>($4);
     ast->lval = *unique_ptr<string>($1);
     ast->lval_ref = ($2);
+    ast->child_num = (int)(*(ast->lval_ref)).size();
     ast->sel = 7;
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -281,6 +299,7 @@ Exp
   : LOrExp {
     auto ast = new ExpAST();
     ast->lorexp = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -290,6 +309,7 @@ LOrExp
     auto ast = new LOrExpAST();
     ast->sel = 0;
     ast->landexp = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | LOrExp OROPT LAndExp {
@@ -297,6 +317,7 @@ LOrExp
     ast->sel = 1;
     ast->lorexp = unique_ptr<BaseAST>($1);
     ast->landexp = unique_ptr<BaseAST>($3);
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -306,6 +327,7 @@ LAndExp
     auto ast = new LAndExpAST();
     ast->sel = 0;
     ast->eqexp = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | LAndExp ANDOPT EqExp {
@@ -313,6 +335,7 @@ LAndExp
     ast->sel = 1;
     ast->landexp = unique_ptr<BaseAST>($1);
     ast->eqexp = unique_ptr<BaseAST>($3);
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -322,6 +345,7 @@ EqExp
     auto ast = new EqExpAST();
     ast->sel = 0;
     ast->relexp = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | EqExp EQOPT RelExp {
@@ -330,6 +354,7 @@ EqExp
     ast->eqexp = unique_ptr<BaseAST>($1);
     ast->rel = *unique_ptr<string>($2);
     ast->relexp = unique_ptr<BaseAST>($3);
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -339,6 +364,7 @@ RelExp
     auto ast = new RelExpAST();
     ast->sel = 0;
     ast->addexp = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | RelExp RELOPT AddExp {
@@ -347,6 +373,7 @@ RelExp
     ast->relexp = unique_ptr<BaseAST>($1);
     ast->rel = *unique_ptr<string>($2);
     ast->addexp = unique_ptr<BaseAST>($3);
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -356,6 +383,7 @@ AddExp
     auto ast = new AddExpAST();
     ast->sel = 0;
     ast->mulexp = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | AddExp UOP MulExp {
@@ -364,6 +392,7 @@ AddExp
     ast->addexp = unique_ptr<BaseAST>($1);
     ast->opt = *unique_ptr<string>($2);
     ast->mulexp = unique_ptr<BaseAST>($3);
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -373,6 +402,7 @@ MulExp
     auto ast = new MulExpAST();
     ast->sel = 0;
     ast->unaryexp = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | MulExp MULOPT UnaryExp {
@@ -381,6 +411,7 @@ MulExp
     ast->mulexp = unique_ptr<BaseAST>($1);
     ast->opt = *unique_ptr<string>($2);
     ast->unaryexp = unique_ptr<BaseAST>($3);
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -390,6 +421,7 @@ UnaryExp
     auto ast = new UnaryExpAST();
     ast->sel = 0;
     ast->pexp = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | UOP UnaryExp {
@@ -397,6 +429,7 @@ UnaryExp
     ast->sel = 1;
     ast->opt = *unique_ptr<string>($1);
     ast->unaryexp = unique_ptr<BaseAST>($2);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | IDENT '(' FuncRParams ')' {
@@ -405,6 +438,7 @@ UnaryExp
     ast->ident = *unique_ptr<string>($1);
     ast->funcrparam = ($3);
     ast->child_num = (int)(*(ast->funcrparam)).size();
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -444,12 +478,14 @@ PrimaryExp
     auto ast = new PrimaryExpAST();
     ast->sel = 0;
     ast->exp = unique_ptr<BaseAST>($2);    
+    ast->can_compute = 0;
     $$ = ast;
   }
   | Number {
     auto ast = new PrimaryExpAST();
     ast->sel = 1;
     ast->number = ($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | LVal {
@@ -457,6 +493,8 @@ PrimaryExp
     auto ast = new PrimaryExpAST();
     ast->sel = 2;
     ast->lval = *unique_ptr<string>($1);
+    ast->child_num = 0;
+    ast->can_compute = 0;
     $$ = ast;
   }
   | LVal Refer_ELEMENT {
@@ -464,6 +502,8 @@ PrimaryExp
     ast->sel = 3;
     ast->lval = *unique_ptr<string>($1);
     ast->lval_ref = ($2);
+    ast->child_num = (int)(*(ast->lval_ref)).size();
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -509,6 +549,7 @@ InitVal
     auto ast = new InitValAST();
     ast->exp = unique_ptr<BaseAST>($1);
     ast->sel = 0;
+    ast->can_compute = 0;
     $$ = ast;
   }
   | '{' InitVals '}' {
@@ -516,6 +557,7 @@ InitVal
     ast->initvals = ($2);
     ast->child_num = (int)(*(ast->initvals)).size();
     ast->sel = 1;
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -546,6 +588,7 @@ ConstExp
   : Exp {
     auto ast = new ConstExpAST();
     ast->exp = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -555,6 +598,7 @@ ConstInitVal
     auto ast = new ConstInitValAST();
     ast->sel = 0;
     ast->constexp = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | '{' ConstInitVals '}' {
@@ -562,6 +606,7 @@ ConstInitVal
     ast->constinitvals = ($2);
     ast->child_num = (int)(*(ast->constinitvals)).size();
     ast->sel = 1;
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -595,12 +640,14 @@ BlockItem
     auto ast = new BlockItemAST();
     ast->decl = unique_ptr<BaseAST>($1);
     ast->sel = 0;
+    ast->can_compute = 0;
     $$ = ast;
   }
   | GLBIf {
     auto ast = new BlockItemAST();
     ast->glbif = unique_ptr<BaseAST>($1);
     ast->sel = 1;
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -610,12 +657,14 @@ Decl
     auto ast = new DeclAST();
     ast->constdecl = unique_ptr<BaseAST>($1);
     ast->sel = 0;
+    ast->can_compute = 0;
     $$ = ast;
   }
   | VarDecl {
     auto ast = new DeclAST();
     ast->vardecl = unique_ptr<BaseAST>($1);
     ast->sel = 1;
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -625,6 +674,8 @@ VarDef
     auto ast = new VarDefAST();
     ast->ident = *unique_ptr<string>($1);
     ast->sel = 0;
+    ast->child_num = 0;
+    ast->can_compute = 0;
     $$ = ast;
   }
   | IDENT '=' InitVal {
@@ -632,6 +683,8 @@ VarDef
     ast->ident = *unique_ptr<string>($1);
     ast->initval = unique_ptr<BaseAST>($3);
     ast->sel = 1;
+    ast->child_num = 0;
+    ast->can_compute = 0;
     $$ = ast;
   }
   | IDENT SIZE_ELEMENT {
@@ -640,6 +693,7 @@ VarDef
     ast->constexp = ($2);
     ast->child_num = (int)(*(ast->constexp)).size();
     ast->sel = 2;
+    ast->can_compute = 0;
     $$ = ast;
   }
   | IDENT SIZE_ELEMENT '=' InitVal {
@@ -649,6 +703,7 @@ VarDef
     ast->child_num = (int)(*(ast->constexp)).size();
     ast->initval = unique_ptr<BaseAST>($4);
     ast->sel = 3;
+    ast->can_compute = 0;
     $$ = ast; 
   }
   ;
@@ -659,6 +714,7 @@ VarDecl
     ast->btype = *unique_ptr<std::string>($1);
     ast->vardef = ($2);
     ast->child_num = (int)(*(ast->vardef)).size();
+    ast->can_compute = 0;
     $$ = ast;
   }
   ; 
@@ -708,6 +764,8 @@ ConstDef
     ast->ident = *unique_ptr<string>($1);
     ast->constinitval = unique_ptr<BaseAST>($3);
     ast->sel = 0;
+    ast->child_num = 0;
+    ast->can_compute = 0;
     $$ = ast;
   }
   | IDENT SIZE_ELEMENT '=' ConstInitVal {
@@ -717,6 +775,7 @@ ConstDef
     ast->child_num = (int)(*(ast->constexp)).size();
     ast->constinitval = unique_ptr<BaseAST>($4);
     ast->sel = 1;
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;
@@ -727,6 +786,7 @@ ConstDecl
     ast->btype = *unique_ptr<std::string>($2);
     ast->constdef = ($3);
     ast->child_num = (int)(*(ast->constdef)).size();
+    ast->can_compute = 0;
     $$ = ast;
   }
   ; 
@@ -750,11 +810,13 @@ OptionalExp
   : Exp {
     auto ast = new OptionalExpAST();
     ast->exp = unique_ptr<BaseAST>($1);
+    ast->can_compute = 0;
     $$ = ast;
   }
   | {
     auto ast = new OptionalExpAST();
     ast->exp = NULL;
+    ast->can_compute = 0;
     $$ = ast;
   }
   ;

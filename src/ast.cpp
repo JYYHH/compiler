@@ -23,7 +23,7 @@
         4.  int var_num, is_01;
             int var_ins[300005];
            这些是用来维护，IR_generating过程中，所有 `%number` 项目的信息
-        6.
+        6. newest_for_each_level : 每一层指针的最新值
           
 */
 
@@ -44,6 +44,9 @@ int If_num = 0, While_NUM = 0;
 int OR_num = 0, AND_num = 0;
 int Continue_num = 0, Break_num = 0;
 stack <int> while_stack;
+SymbolTableItem* var_need_valued = NULL;
+string var_need_valued_name;
+int newest_for_each_level[33];
 
 inline void UPDATE(){
     Pr &u = TOP;
@@ -230,7 +233,7 @@ void StmtAST :: IRDump() const {
                 std::cout << "    store %" << var_num - 1 << ", @" << lval_belong->ST_name << '_' << lval << endl;
     }
     else if (sel == 1){
-        if (can_compute == 0)
+        if (can_compute != MODE)
             optionalexp->IRDump();
     }
     else if (sel == 2)
@@ -274,6 +277,23 @@ void StmtAST :: IRDump() const {
         Break_num ++;
         std::cout << "    jump %WHILE_END_" << while_stack.top() << endl;
         std::cout << " %" << "AFTER_BREAK_" << Break_num << ':' << endl;
+    }
+    else{
+        string alter_one = lval;
+        auto ret = lval_belong->GetItemByName(alter_one);
+        var_need_valued_name = lval_belong->ST_name + "_" + lval;
+        load_matrix_pointer(ret, lval_ref);
+
+        if (exp->can_compute == MODE){
+            cout << "    store " << exp->val << ", %" <<  "ptr_" << ret->dimension - 1 << '_' << newest_for_each_level[ret->dimension - 1] - 1 << endl;
+        }
+        else{
+            exp->IRDump();
+            if (is_01 >> 1)
+                cout << "    store " << var_ins[var_num - 1] << ", %" <<  "ptr_" << ret->dimension - 1 << '_' << newest_for_each_level[ret->dimension - 1] - 1 << endl;
+            else
+                cout << "    store %" << var_num - 1 << ", %" <<  "ptr_" << ret->dimension - 1 << '_' << newest_for_each_level[ret->dimension - 1] - 1 << endl;
+        }
     }
 }
 
@@ -523,17 +543,112 @@ void PrimaryExpAST :: IRDump() const {
             std::cout << "    %" << var_num << " = load @" << lval_belong->ST_name << '_' << lval << endl;
         var_num ++, is_01 = 0;
     }
-    else 
+    else if (sel == 1){
         alr_compute_procedure(val);
+    }
+    else{
+        string alter_one = lval;
+        auto ret = lval_belong->GetItemByName(alter_one);
+        var_need_valued_name = lval_belong->ST_name + "_" + lval;
+        load_matrix_pointer(ret, lval_ref);
+
+        // %value = load %ptr2 
+        std::cout << "    %" << var_num << " = load %" << "ptr_" << ret->dimension - 1 << '_' << newest_for_each_level[ret->dimension - 1] - 1 << endl;
+        is_01 = 0;
+        var_num ++;
+    }
+}
+
+void load_matrix_pointer(SymbolTableItem* tbl_item, std::vector< std::unique_ptr<BaseAST> > *LVAL_ref){
+    int DIM = tbl_item->dimension;
+    (*LVAL_ref)[0]->IRDump();
+    if (is_01 >> 1)
+        cout << "    %" << "ptr_" << 0 << "_" << newest_for_each_level[0] << " = getelemptr @" << var_need_valued_name << ", " << var_ins[var_num - 1] << endl;
+    else 
+        cout << "    %" << "ptr_" << 0 << "_" << newest_for_each_level[0] << " = getelemptr @" << var_need_valued_name << ", %" << var_num - 1 << endl;
+    newest_for_each_level[0] ++;
+
+    for(int i=1;i<DIM;i++){
+        (*LVAL_ref)[i]->IRDump();
+        if (is_01 >> 1)
+            cout << "    %" << "ptr_" << i << "_" << newest_for_each_level[i] << " = getelemptr %" << "ptr_" << i - 1 << '_' << newest_for_each_level[i - 1] - 1 <<  ", " << var_ins[var_num - 1] << endl;
+        else
+            cout << "    %" << "ptr_" << i << "_" << newest_for_each_level[i] << " = getelemptr %" << "ptr_" << i - 1 << '_' << newest_for_each_level[i - 1] - 1 <<  ", %" << var_num - 1 << endl;
+        newest_for_each_level[i] ++;
+    }
 }
 
 
 // --------------------------------- Lv_4  Const and Var-------------------------------------
+void InitValAST :: Solve_array_assign2(int lev) const {
+    if (sel == 0){
+        exp->IRDump();
+        
+        var_need_valued->PushBack(((var_num-1)<<1) + (is_01>>1)); // 有用
+    }
+    else{
+        if (lev >= var_need_valued->dimension)
+            exit(16);
+        std::vector< std::unique_ptr<BaseAST> > &now_vec = *initvals; 
+        for(int i=0;i<child_num;i++)
+            ((InitValAST *)(now_vec[i].get()))->Solve_array_assign2(var_need_valued->check_lev());
+        
+        if (var_need_valued->filled > var_need_valued->mul_dim){
+            exit(17);
+        }
+
+        int align_size = var_need_valued->lev_size(lev);
+        int have_any = 0;
+        while(var_need_valued->filled == 0 || var_need_valued->filled % align_size){
+            if (have_any == 0)
+                var_ins[var_num++] = 0, is_01 = 2;
+            var_need_valued->PushBack(1|((var_num - 1) << 1));
+        }
+    }
+}
+void IR_alloc_code_gen_REALVAR(int lev, SymbolTableItem* tbl_item, int stride, int position){
+    if (lev < tbl_item->dimension - 1){
+        int lev_len = (*(tbl_item->dimension_item))[lev];
+        int next_len = (*(tbl_item->dimension_item))[lev + 1];
+        for (int i=0;i<lev_len;i++){
+            // %ptr0 = getelemptr @arr, 1
+            if (lev)
+                cout << "    %" << "ptr_" << lev << "_" << newest_for_each_level[lev] << " = getelemptr %" << "ptr_" << lev - 1 << '_' << newest_for_each_level[lev - 1] - 1 <<  ", " << i << endl;
+            else
+                cout << "    %" << "ptr_" << lev << "_" << newest_for_each_level[lev] << " = getelemptr @" << var_need_valued_name << ", " << i << endl;
+            newest_for_each_level[lev] ++;
+            IR_alloc_code_gen_REALVAR(lev + 1, tbl_item, stride / next_len, position + i * stride);
+        }
+    }
+    else{
+        int lev_len = (*(tbl_item->dimension_item))[lev], VAR_NUM, IS_01;
+        for (int i=0;i<lev_len;i++){
+            if (lev)
+                cout << "    %" << "ptr_" << lev << "_" << newest_for_each_level[lev] << " = getelemptr %" << "ptr_" << lev - 1 << '_' << newest_for_each_level[lev - 1] - 1 <<  ", " << i << endl;
+            else
+                cout << "    %" << "ptr_" << lev << "_" << newest_for_each_level[lev] << " = getelemptr @" << var_need_valued_name << ", " << i << endl;
+            VAR_NUM = tbl_item->arr[position + i] >> 1;
+            IS_01 = tbl_item->arr[position + i] & 1;
+            newest_for_each_level[lev] ++;
+            // store {1, 2, 3, 0, 0}, @arr
+            if (IS_01)
+                cout << "    store " << var_ins[VAR_NUM] << ", %" <<  "ptr_" << lev << "_" << newest_for_each_level[lev] - 1 << endl;
+            else
+                cout << "    store %" << VAR_NUM << ", %" <<  "ptr_" << lev << "_" << newest_for_each_level[lev] - 1 << endl;
+        }
+    }
+}
 
 void InitValAST :: IRDump() const {
-    if (PreComputeProcedure()) return;
-    
-    exp->IRDump();
+    if (sel == 0){
+        if (PreComputeProcedure()) return;
+        exp->IRDump();
+    }
+    else{
+        Solve_array_assign2(0);
+        IR_alloc_code_gen_REALVAR(0, var_need_valued, var_need_valued->mul_dim / (*(var_need_valued->dimension_item))[0], 0);
+        var_need_valued = NULL;
+    }
 }
 
 void ConstInitValAST :: IRDump() const {
@@ -577,32 +692,105 @@ std::string btype_transfer(std::string &BTYPE){
         return BTYPE;
 }
 
+void IR_alloc_code_gen_const(int lev, const ConstDefAST* ast){
+    if (lev == ast->child_num - 1){
+        cout << "[i32, " << (*(ast->constexp))[lev]->val << ']';
+        return;
+    }
+    cout << '[';
+    IR_alloc_code_gen_const(lev + 1, ast);
+    cout << ", " << (*(ast->constexp))[lev]->val << ']';
+}
+
+void IR_alloc_code_gen(int lev, const VarDefAST* ast){
+    if (lev == ast->child_num - 1){
+        cout << "[i32, " << (*(ast->constexp))[lev]->val << ']';
+        return;
+    }
+    cout << '[';
+    IR_alloc_code_gen(lev + 1, ast);
+    cout << ", " << (*(ast->constexp))[lev]->val << ']';
+}
+
+void IR_alloc_code_gen2(int lev, SymbolTableItem* tbl_item, int stride, int position){
+    cout << '{';
+    if (lev < tbl_item->dimension - 1){
+        int lev_len = (*(tbl_item->dimension_item))[lev];
+        int next_len = (*(tbl_item->dimension_item))[lev + 1];
+        IR_alloc_code_gen2(lev + 1, tbl_item, stride / next_len, position);
+        for (int i=1;i<lev_len;i++){
+            cout << ", ";
+            IR_alloc_code_gen2(lev + 1, tbl_item, stride / next_len, position + i * stride);
+        }
+    }
+    else{
+        int lev_len = (*(tbl_item->dimension_item))[lev];
+        cout << tbl_item->arr[position];
+        for (int i=1;i<lev_len;i++)
+            cout << ", " << tbl_item->arr[position + i];
+    }
+    cout << '}';
+}
+
 void VarDefAST :: IRDump() const {
     if (present_tbl() == glbsymbtl){
         // 全局的变量
-        if (can_compute) // 这个不管选不选优化都不能关掉，因为全局变量的赋值必须当场解决
-            std::cout << "global @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << ", " << val << endl;
-        else if (sel == 0)
-            std::cout << "global @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << ", zeroinit" << endl;
-        else 
-            exit(12);
+        if (sel < 2){
+            if (can_compute) // 这个不管选不选优化都不能关掉，因为全局变量的赋值必须当场解决
+                std::cout << "global @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << ", " << val << endl;
+            else if (sel == 0)
+                std::cout << "global @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << ", zeroinit" << endl;
+            else 
+                exit(12);
+        }
+        else{
+            std::cout << "global @" << present_tbl()->ST_name << '_' << ident << " = alloc ";
+            IR_alloc_code_gen(0, (const VarDefAST *)this);
+
+            if (sel == 2)
+                cout << ", zeroinit" << endl;
+            else{
+                auto lll = ident;
+                SymbolTableItem* ret = present_tbl()->GetItemByName(lll);
+                cout << ", ";
+                IR_alloc_code_gen2(0, ret, ret->mul_dim / (*(ret->dimension_item))[0], 0);
+                cout << endl;
+            }
+        }
     }
     else{
         // 函数内的变量
-        //@x = alloc i32
-        std::cout << "    @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << endl;
-        // 保证 ident 在当前 symbol table 里
-        if (can_compute == MODE)
-            // Although Already in SymTb, we should also make sure it's stored
-            std::cout << "    store " << val << ", @" << present_tbl()->ST_name << '_' << ident << endl;
-        else if (sel){
-            initval->IRDump();
-            // The same as case in StmtAST, we can make sure this can't be a constant
-            // Also finally implemented such a f**k if, for debugging
-            if(is_01 >> 1)
-                std::cout << "    store " << var_ins[var_num - 1] << ", @" << present_tbl()->ST_name << '_' << ident << endl;
-            else
-                std::cout << "    store %" << var_num - 1 << ", @" << present_tbl()->ST_name << '_' << ident << endl;
+        if (sel < 2){
+            //@x = alloc i32
+            std::cout << "    @" << present_tbl()->ST_name << '_' << ident << " = alloc " << btype_transfer(now_btype) << endl;
+            // 保证 ident 在当前 symbol table 里
+            if (can_compute == MODE)
+                // Although Already in SymTb, we should also make sure it's stored
+                std::cout << "    store " << val << ", @" << present_tbl()->ST_name << '_' << ident << endl;
+            else if (sel){
+                initval->IRDump();
+                // The same as case in StmtAST, we can make sure this can't be a constant
+                // Also finally implemented such a f**k if, for debugging
+                if(is_01 >> 1)
+                    std::cout << "    store " << var_ins[var_num - 1] << ", @" << present_tbl()->ST_name << '_' << ident << endl;
+                else
+                    std::cout << "    store %" << var_num - 1 << ", @" << present_tbl()->ST_name << '_' << ident << endl;
+            }
+        }
+        else{
+            // 数组，且局部变量永远不会先算
+            std::cout << "    @" << present_tbl()->ST_name << '_' << ident << " = alloc ";
+            IR_alloc_code_gen(0, this);
+            std::cout << endl;
+
+            if (sel == 3){
+                auto lll = ident;
+                var_need_valued = present_tbl()->GetItemByName(lll);
+                var_need_valued_name = present_tbl()->ST_name + "_" + ident;
+                if (((InitValAST *)initval.get())->sel == 0)
+                    exit(15);
+                initval->IRDump();
+            }
         }
     }
 }
@@ -737,10 +925,3 @@ void IfElseStmtAST :: IRDump() const {
         std::cout << " %" << "br_" << BLKID << '_' << ID_instr << '_' << IFNUM << '_'  << "end:" << endl;
     }
 }
-
-// %0 = load @x
-// std::cout << "    %" << var_num << " = load @" << present_tbl()->ST_name << '_' << lval << endl
-// store %1, @x
-// std::cout << "    store %" << var_num - 1 << ", @" << present_tbl()->ST_name << '_' << lval << endl;
-// @x = alloc i32
-// std::cout << "    @" << present_tbl()->ST_name << '_' << lval << " = alloc " << btype_transfer(BTYPE) << endl;
