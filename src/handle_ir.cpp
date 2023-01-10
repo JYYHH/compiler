@@ -803,7 +803,6 @@ void Visit(const koopa_raw_get_ptr_t &get_ptr, const int mode){
 int handle_str_ir(const char *str){
   koopa_program_t program;
   koopa_error_code_t ret = koopa_parse_from_string(str, &program);
-  exit(ret);
   assert(ret == KOOPA_EC_SUCCESS);
   koopa_raw_program_builder_t builder = koopa_new_raw_program_builder();
   koopa_raw_program_t raw = koopa_build_raw_program(builder, program);
