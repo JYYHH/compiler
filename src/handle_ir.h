@@ -46,10 +46,15 @@ void Visit(const koopa_raw_branch_t &Branch, const int mode);
 void Visit(const koopa_raw_jump_t &Jump, const int mode);
 void Give_param2Callee(const koopa_raw_slice_t &slice); // 处理函数调用
 void Visit(const koopa_raw_call_t &Call, const int mode);
+void Visit(const koopa_raw_get_elem_ptr_t &get_ele, const int mode);
+void Visit(const koopa_raw_get_ptr_t &get_ptr, const int mode);
 
 
 
 int handle_str_ir(const char *str);
+int cal_size_(const koopa_raw_type_t &type);
+inline void put_zero();
+void Solve_aggregate(const koopa_raw_global_alloc_t &aggregate);
 
 // -------------------------Target Langudage Part (RISC-V)-------------------------------------
 

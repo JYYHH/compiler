@@ -26,6 +26,8 @@ unordered_map<koopa_raw_binary_t* , unsigned int> mmp; // bin_instr -> offset
 unordered_map<koopa_raw_load_t* , unsigned int> ldmmp; // load_instr (等号左边的百分号) -> offset
 unordered_map<koopa_raw_value_t, unsigned int> allcmmp; // local alloc -> offset
 unordered_map<koopa_raw_call_t*, unsigned int> callmmp; // call_instr -> offset
+unordered_map<koopa_raw_get_elem_ptr_t*, unsigned int> get_ele_mmp; // get_ele_ptr -> offset
+unordered_map<koopa_raw_get_ptr_t*, unsigned int> get_ptr_mmp; // get_ele_ptr -> offset
 string now_func_name_risc;
 int if_define_stage;
 static string param_reg_name[8] = {
@@ -50,6 +52,17 @@ inline void Offset2Register(unsigned int &OFFSET, string reg_name, string init_s
     cout << risc_lw("t1", reg_name, 0);
   }
 }
+
+inline void PureOffSet2Register(unsigned int &OFFSET, string reg_name, string init_stack_p = "sp"){
+  if (OFFSET < (1<<11)){
+    cout << risc_addi(reg_name, init_stack_p, OFFSET);
+  }
+  else{
+    cout << risc_li("t1", OFFSET);
+    cout << risc_add(reg_name, "t1", init_stack_p);
+  }
+}
+
 // 前身是 Binary2Register ： 将某条二进制指令的结果load到指定寄存器中
 inline void Binary2Register(koopa_raw_binary_t* addr, string reg_name, string init_stack_p = "sp"){
   unsigned int offset = mmp[addr];
@@ -66,13 +79,40 @@ inline void Alloc2Register(koopa_raw_value_t addr, string reg_name, string init_
   Offset2Register(offset, reg_name, init_stack_p);
 }
 
+inline void AllocAddr2Register(koopa_raw_value_t addr, string reg_name, string init_stack_p = "sp"){
+  unsigned int offset = allcmmp[addr];
+  PureOffSet2Register(offset, reg_name, init_stack_p);
+}
+
 inline void Call2Register(koopa_raw_call_t* addr, string reg_name, string init_stack_p = "sp"){
   unsigned int offset = callmmp[addr];
   Offset2Register(offset, reg_name, init_stack_p);
 }
 
+inline void GetEle2Register(koopa_raw_get_elem_ptr_t* addr, string reg_name, string init_stack_p = "sp"){
+  unsigned int offset = get_ele_mmp[addr];
+  Offset2Register(offset, reg_name, init_stack_p);
+}
+
+inline void GetPtr2Register(koopa_raw_get_ptr_t* addr, string reg_name, string init_stack_p = "sp"){
+  unsigned int offset = get_ptr_mmp[addr];
+  Offset2Register(offset, reg_name, init_stack_p);
+}
+
+inline void GetEleREAL2Register(koopa_raw_get_elem_ptr_t* addr, string reg_name, string init_stack_p = "sp"){
+  unsigned int offset = get_ele_mmp[addr];
+  Offset2Register(offset, "t1", init_stack_p);
+  cout << risc_lw("t1", reg_name, 0);
+}
+
+inline void GetPtrREAL2Register(koopa_raw_get_ptr_t* addr, string reg_name, string init_stack_p = "sp"){
+  unsigned int offset = get_ptr_mmp[addr];
+  Offset2Register(offset, "t1", init_stack_p);
+  cout << risc_lw("t1", reg_name, 0);
+}
+
 // From an Instr to the Register
-inline void Instr2Register(const koopa_raw_value_t& addr, string reg_name, string init_stack_p = "sp"){
+inline void Instr2Register(const koopa_raw_value_t& addr, string reg_name, string init_stack_p = "sp", int get_addr = 0){
   if (addr == NULL) // void
     return;
 
@@ -82,18 +122,34 @@ inline void Instr2Register(const koopa_raw_value_t& addr, string reg_name, strin
       cout << risc_li(reg_name, addr->kind.data.integer.value) ;
       break;
     case KOOPA_RVT_BINARY :
-      Binary2Register((koopa_raw_binary_t* )&(addr->kind.data.binary), reg_name, init_stack_p);
+      Binary2Register((koopa_raw_binary_t *)&(addr->kind.data.binary), reg_name, init_stack_p);
       break;
     case KOOPA_RVT_LOAD :
       // Load 的 result 放到 Reg 上
-      Load2Register((koopa_raw_load_t* )&(addr->kind.data.load), reg_name, init_stack_p);
+      Load2Register((koopa_raw_load_t *)&(addr->kind.data.load), reg_name, init_stack_p);
       break;
     case KOOPA_RVT_ALLOC :
-      // 这个对应的局部变量的结果放到 Reg 上
-      Alloc2Register((koopa_raw_value_t)(addr), reg_name, init_stack_p);
+      if (get_addr == 0)
+        // 这个对应的局部变量的结果放到 Reg 上
+        Alloc2Register((koopa_raw_value_t)(addr), reg_name, init_stack_p);
+      else
+        // 我们只想要这个局部变量的地址
+        AllocAddr2Register((koopa_raw_value_t)(addr), reg_name, init_stack_p);
       break;
     case KOOPA_RVT_CALL:
-      Call2Register((koopa_raw_call_t* )&(addr->kind.data.call), reg_name, init_stack_p);
+      Call2Register((koopa_raw_call_t *)&(addr->kind.data.call), reg_name, init_stack_p);
+      break;
+    case KOOPA_RVT_GET_ELEM_PTR:
+      if (get_addr == 0)
+        GetEleREAL2Register((koopa_raw_get_elem_ptr_t *)&(addr->kind.data.get_elem_ptr), reg_name, init_stack_p);
+      else
+        GetEle2Register((koopa_raw_get_elem_ptr_t *)&(addr->kind.data.get_elem_ptr), reg_name, init_stack_p);
+      break;
+    case KOOPA_RVT_GET_PTR:
+      if (get_addr == 0)
+        GetPtrREAL2Register((koopa_raw_get_ptr_t *)&(addr->kind.data.get_ptr), reg_name, init_stack_p);
+      else
+        GetPtr2Register((koopa_raw_get_ptr_t *)&(addr->kind.data.get_ptr), reg_name, init_stack_p);
       break;
     case KOOPA_RVT_FUNC_ARG_REF:
       reg_rank = addr->kind.data.func_arg_ref.index;
@@ -115,7 +171,10 @@ inline void Instr2Register(const koopa_raw_value_t& addr, string reg_name, strin
       break;
     case KOOPA_RVT_GLOBAL_ALLOC :
       cout << risc_la("t1", addr->name + 1);
-      cout << risc_lw("t1", reg_name, 0);
+      if (get_addr == 0)
+        cout << risc_lw("t1", reg_name, 0);
+      else
+        cout << risc_addi(reg_name, "t1", 0);
       break;
     default:
       assert(false);
@@ -156,6 +215,17 @@ inline void Register2Call(koopa_raw_call_t* addr, string reg_name, string init_s
   Register2Stack(offset, reg_name, init_stack_p);
 }
 
+inline void Register2GetEle(koopa_raw_get_elem_ptr_t* addr, string reg_name, string init_stack_p = "sp"){
+  unsigned int offset = get_ele_mmp[addr];
+  Register2Stack(offset, reg_name, init_stack_p);
+}
+
+inline void Register2GetPtr(koopa_raw_get_ptr_t* addr, string reg_name, string init_stack_p = "sp"){
+  unsigned int offset = get_ptr_mmp[addr];
+  Register2Stack(offset, reg_name, init_stack_p);
+}
+
+
 inline void Register2Instr(const koopa_raw_value_t& addr, string reg_name, string init_stack_p = "sp"){
   switch (addr->kind.tag) {
     case KOOPA_RVT_INTEGER :
@@ -176,8 +246,12 @@ inline void Register2Instr(const koopa_raw_value_t& addr, string reg_name, strin
       cout << risc_la("t1", addr->name + 1);
       cout << risc_sw("t1", reg_name, 0);
       break;
-    default:
-      assert(false);
+    default :
+      Instr2Register((koopa_raw_value_t)(addr), "t1", "sp", 1);
+      cout << risc_sw("t1", reg_name, 0);
+      break;
+    // default:
+    //   assert(false);
   } 
 }
 
@@ -294,13 +368,66 @@ inline void binary2risc(koopa_raw_binary_op_t optype, string o1, string o2){
 
 string Global_name;
 
+int zero_num = 0;
+
+void put_zero(){
+  int temp;
+  while(zero_num){
+    temp = zero_num & -zero_num;
+    cout << "   .zero " << (temp << 2) << endl;
+    zero_num -= temp;
+  }
+}
+
+void Solve_aggregate(const koopa_raw_aggregate_t &aggregate){
+  const koopa_raw_slice_t &slice = aggregate.elems;
+  for (size_t i = 0; i < slice.len; ++i) {
+    auto ptr = slice.buffer[i];
+    // 根据 slice 的 kind 决定将 ptr 视作何种元素
+    // cout << slice.kind << endl;
+    auto value = reinterpret_cast<koopa_raw_value_t>(ptr);
+    if (value->kind.tag == KOOPA_RVT_INTEGER){
+      const int32_t &now_int = value->kind.data.integer.value;
+      if (now_int == 0) zero_num ++;
+      else{
+        put_zero();
+        cout << "   .word " << now_int << endl;
+      }
+    }
+    else if (value->kind.tag == KOOPA_RVT_AGGREGATE)
+      Solve_aggregate(value->kind.data.aggregate);
+    else 
+      exit(18);
+  }
+}
+
 inline void Define(const koopa_raw_global_alloc_t &global_alloc){
   cout << "   .global " << Global_name << endl;
   cout << Global_name << ':' << endl;
   if (global_alloc.init->kind.tag == KOOPA_RVT_INTEGER)
     cout << "   .word " << global_alloc.init->kind.data.integer.value << endl;
-  else
-    cout << "   .zero 4" << endl;
+  else if (global_alloc.init->kind.tag == KOOPA_RVT_ZERO_INIT)
+    cout << "   .zero " << cal_size_(global_alloc.init->ty) << endl;
+  else{
+    // aggregate
+    zero_num = 0; // We do a small optimization to the allocation
+    Solve_aggregate(global_alloc.init->kind.data.aggregate);
+    put_zero();
+  }
+}
+
+int cal_size_(const koopa_raw_type_t &type){
+  switch (type->tag) {
+    case KOOPA_RTT_UNIT: 
+      return 0;
+      break;
+    case KOOPA_RTT_ARRAY:
+      return type->data.array.len * cal_size_(type->data.array.base);
+      break;
+    default:
+      return 4;
+      break;
+  }
 }
 
 
@@ -359,6 +486,7 @@ void Visit(const koopa_raw_function_t &func, const int mode) {
     printf("%s:\n", func->name + 1);
   ClearStack();
   Visit(func->bbs, 1); // 预计算出需要的栈空间
+          // 由于我的 implementation 是 只有局部数组需要占栈空间，所以
   pre_func();
   
   // 访问所有基本块
@@ -406,6 +534,7 @@ void Visit(const koopa_raw_value_t &value, const int mode) {
   const auto &kind = value->kind;
   string tttmmpp;
   SymbolTableItem* ret;
+  int Size_alloc;
 
   switch (kind.tag) {
     case KOOPA_RVT_RETURN:
@@ -432,13 +561,17 @@ void Visit(const koopa_raw_value_t &value, const int mode) {
       // 之后如果要用这次 binary 指令的运算结果，直接到这个对应的 reg 里面找就行
       break;
     case KOOPA_RVT_ALLOC:
+      Size_alloc = cal_size_(value->ty->data.pointer.base);
+      // if (!mode){
+      //   cout << Size_alloc << ' ' << value->ty->tag << ' ' << value->ty->data.pointer.base->tag << endl;
+      // }
       if (!mode){
         allcmmp[(koopa_raw_value_t)(value)] = GetStackSize();
         // 局部变量不进行初始化
-        GrowStack(4);
+        GrowStack(Size_alloc);
       }
       else 
-        GrowStack(4);
+        GrowStack(Size_alloc);
       break;
     case KOOPA_RVT_LOAD:
       if (!mode){
@@ -488,6 +621,20 @@ void Visit(const koopa_raw_value_t &value, const int mode) {
       else{
         // Do Nothing
       }
+      break;
+    case KOOPA_RVT_GET_ELEM_PTR:
+      if (!mode){
+        Visit(kind.data.get_elem_ptr, mode);
+      }
+      else
+        GrowStack(4);
+      break;
+    case KOOPA_RVT_GET_PTR:
+      if (!mode){
+        Visit(kind.data.get_ptr, mode);
+      }
+      else
+        GrowStack(4);
       break;
     default:
       // break;
@@ -579,7 +726,7 @@ void Give_param2Callee(const koopa_raw_slice_t &slice){
   for (size_t i = 0; i < slice.len; ++i) {
     auto ptr = slice.buffer[i];
     auto now_value = reinterpret_cast<koopa_raw_value_t>(ptr);
-    Instr2Register(now_value, "t2");
+    Instr2Register(now_value, "t2", "sp", 2);
     
     if (i <= 7){
       // 前面八个参数搞到 Reg 里
@@ -617,6 +764,40 @@ void Visit(const koopa_raw_call_t &Call, const int mode){
     Register2Call((koopa_raw_call_t* )(&Call), "a0"); // 返回值在 a0 里，如果有的话
     GrowStack(4);
   }
+}
+
+void Visit(const koopa_raw_get_elem_ptr_t &get_ele, const int mode){
+  // %ptr = getelemptr @arr, 1
+  get_ele_mmp[(koopa_raw_get_elem_ptr_t* )(&get_ele)] = GetStackSize();
+
+  assert(get_ele.src->ty->data.pointer.base->tag == KOOPA_RTT_ARRAY);
+  // 可以肯定用 getelemptr 的 pointer 一定指向了一个数组
+
+  int stride = cal_size_(get_ele.src->ty->data.pointer.base) / get_ele.src->ty->data.pointer.base->data.array.len;
+  Instr2Register(get_ele.src, "t3", "sp", 1);
+  Instr2Register(get_ele.index, "t1");
+  cout << risc_li("t2", stride);
+  binary2risc(8, "t1", "t2"); //mul, result in "t2"
+  cout << risc_add("t2", "t3", "t2"); // final address
+  Register2GetEle((koopa_raw_get_elem_ptr_t *)(&get_ele), "t2");
+
+  GrowStack(4);
+}
+
+void Visit(const koopa_raw_get_ptr_t &get_ptr, const int mode){
+  // %0 = load %arr
+  // %1 = getptr %0, 1
+  get_ptr_mmp[(koopa_raw_get_ptr_t* )(&get_ptr)] = GetStackSize();
+  
+  int stride = cal_size_(get_ptr.src->ty->data.pointer.base);
+  Instr2Register(get_ptr.src, "t3", "sp", 1);
+  Instr2Register(get_ptr.index, "t1");
+  cout << risc_li("t2", stride);
+  binary2risc(8, "t1", "t2"); //mul, result in "t2"
+  cout << risc_add("t2", "t3", "t2"); // final address
+  Register2GetPtr((koopa_raw_get_ptr_t *)(&get_ptr), "t2");
+
+  GrowStack(4);
 }
 
 int handle_str_ir(const char *str){
