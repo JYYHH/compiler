@@ -659,11 +659,11 @@ void Visit(const koopa_raw_integer_t &INT, const int mode){
 void Visit(const koopa_raw_binary_t &BinOP, const int mode){
   mmp[(koopa_raw_binary_t* )(&BinOP)] = GetStackSize();
   
-  Instr2Register(BinOP.lhs, "t1");
+  Instr2Register(BinOP.lhs, "t3");
 
   Instr2Register(BinOP.rhs, "t2");
 
-  binary2risc(BinOP.op, "t1", "t2");
+  binary2risc(BinOP.op, "t3", "t2");
   // out_come is in 't2'
   Register2Binary((koopa_raw_binary_t* )(&BinOP), "t2");
   // put the result on the stack
