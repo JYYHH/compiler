@@ -200,7 +200,7 @@
         
 */
 
-#define MODE 2 // 2 为关掉优化的模式，1为优化模式
+#define MODE 1 // 2 为关掉优化的模式，1为优化模式
 #define Pr pair<int,int> 
 
 class BaseAST {
